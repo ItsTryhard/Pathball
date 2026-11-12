@@ -4,13 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Checkers Online</title>
+    <title>Pathball</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <div id="mainMenu" class="screen">
-        <h1>CHECKERS</h1>
+        <h1>PATHBALL</h1>
         <p class="subtitle">Choose your game mode</p>
 
         <div class="buttons">
@@ -20,15 +20,41 @@
     </div>
 
     <div id="gameScreen" class="screen hidden">
-        <h1 id="gameTitle">Game</h1>
 
-        <div class="emptyBoard">
-            <p>The game will appear here.</p>
+        <h1 class="gameLogo">PATHBALL</h1>
+
+        <div class="score">
+            <div class="player">
+                <span class="blueDot"></span>
+                Player 1
+                <strong id="score1">0</strong>
+            </div>
+
+            <div class="player">
+                <span class="redDot"></span>
+                Player 2
+                <strong id="score2">0</strong>
+            </div>
         </div>
+
+        <div id="turnInfo">Player 1's turn</div>
+
+        <div class="fieldContainer">
+            <canvas id="gameCanvas" width="900" height="1280"></canvas>
+        </div>
+
+        <p class="instructions">
+            Click on a neighboring point to move the ball.
+        </p>
+
+        <button class="newGame" onclick="newGame()">
+            New game
+        </button>
 
         <button class="backButton" onclick="backToMenu()">
             Back to menu
         </button>
+
     </div>
 
     <script src="script.js"></script>
