@@ -11,6 +11,7 @@ const ROWS = 11;
 const STEP = 90;
 const START_X = 90;
 const START_Y = 180;
+const BALL_MOVE_DURATION = 240;
 
 const GOAL_LEFT = 3;
 const GOAL_RIGHT = 5;
@@ -28,6 +29,7 @@ let score2 = 0;
 let lines = [];
 let visitedPoints = new Map();
 let gameOver = false;
+let ballAnimation = null;
 
 const COLORS = {
     1: "#2563eb",
@@ -54,6 +56,7 @@ function backToMenu() {
 // NEW GAME
 
 function newGame() {
+    ballAnimation = null;
     ball = { x: 4, y: 5 };
     currentPlayer = 1;
 
@@ -274,12 +277,23 @@ function draw() {
     });
 
     // Ball
-    const p = getPosition(ball.x, ball.y);
+    let ballX = ball.x;
+    let ballY = ball.y;
+    let ballScale = 1;
+
+    if (ballAnimation) {
+        const progress = ballAnimation.progress;
+        ballX = ballAnimation.fromX + (ballAnimation.toX - ballAnimation.fromX) * progress;
+        ballY = ballAnimation.fromY + (ballAnimation.toY - ballAnimation.fromY) * progress;
+        ballScale = 1 + 0.4 * Math.sin(Math.PI * progress);
+    }
+
+    const p = getPosition(ballX, ballY);
 
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 21, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, 21 * ballScale, 0, Math.PI * 2);
 
-    ctx.fillStyle = COLORS[currentPlayer];
+    ctx.fillStyle = COLORS[ballAnimation ? ballAnimation.player : currentPlayer];
     ctx.fill();
 
     ctx.strokeStyle = "#333333";
@@ -461,6 +475,43 @@ function getLegalMoves() {
     return moves;
 }
 
+function animateBall(fromX, fromY, toX, toY) {
+    const animation = {
+        fromX,
+        fromY,
+        toX,
+        toY,
+        player: currentPlayer,
+        progress: 0,
+        startedAt: null
+    };
+
+    ballAnimation = animation;
+
+    function renderFrame(timestamp) {
+        if (ballAnimation !== animation) return;
+
+        if (animation.startedAt === null) {
+            animation.startedAt = timestamp;
+        }
+
+        animation.progress = Math.min(
+            (timestamp - animation.startedAt) / BALL_MOVE_DURATION,
+            1
+        );
+        draw();
+
+        if (animation.progress < 1) {
+            requestAnimationFrame(renderFrame);
+        } else {
+            ballAnimation = null;
+            draw();
+        }
+    }
+
+    requestAnimationFrame(renderFrame);
+}
+
 function finishPoint(winner, message) {
     if (winner === 1) {
         score1++;
@@ -478,6 +529,7 @@ function finishPoint(winner, message) {
 
         ball = { x: 4, y: 5 };
         lines = [];
+        ballAnimation = null;
         currentPlayer = currentPlayer === 1 ? 2 : 1;
         visitedPoints = new Map([[`${ball.x},${ball.y}`, currentPlayer]]);
         gameOver = false;
@@ -488,7 +540,7 @@ function finishPoint(winner, message) {
 }
 
 function moveBall(x, y) {
-    if (!isLegalMove(x, y)) return;
+    if (ballAnimation || !isLegalMove(x, y)) return;
 
     const oldX = ball.x;
     const oldY = ball.y;
@@ -513,6 +565,7 @@ function moveBall(x, y) {
     if (!visitedPoints.has(destinationKey)) {
         visitedPoints.set(destinationKey, currentPlayer);
     }
+    animateBall(oldX, oldY, x, y);
 
     // GOAL
     if (isGoalPosition(x, y)) {
