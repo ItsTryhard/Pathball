@@ -11,7 +11,7 @@ const ROWS = 11;
 const STEP = 90;
 const START_X = 90;
 const START_Y = 180;
-const BALL_MOVE_DURATION = 750;
+const BALL_MOVE_DURATION = 300;
 
 const GOAL_LEFT = 3;
 const GOAL_RIGHT = 5;
