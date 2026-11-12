@@ -268,8 +268,8 @@ function moveBall(x, y) {
     ball.x = x;
     ball.y = y;
 
-    // GOAL
-    if (x === 4 && (y === 0 || y === ROWS - 1)) {
+    // GOAL - piłka musi dotrzeć do tylnej ściany bramki
+    if (x >= 3 && x <= 5 && (y === -1 || y === ROWS)) {
         if (currentPlayer === 1) {
             score1++;
         } else {
@@ -337,7 +337,7 @@ canvas.addEventListener("click", function(event) {
 
     if (
         x < 0 || x >= COLS ||
-        y < 0 || y >= ROWS
+        y < -1 || y > ROWS
     ) {
         return;
     }
