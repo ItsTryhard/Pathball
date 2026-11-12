@@ -172,6 +172,23 @@ function draw() {
         STEP
     );
 
+    // Goal owners
+    ctx.font = "bold 22px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = COLORS[1];
+    ctx.fillText(
+        "PLAYER 1 GOAL",
+        START_X + ((GOAL_LEFT + GOAL_RIGHT) / 2) * STEP,
+        START_Y - STEP / 2
+    );
+    ctx.fillStyle = COLORS[2];
+    ctx.fillText(
+        "PLAYER 2 GOAL",
+        START_X + ((GOAL_LEFT + GOAL_RIGHT) / 2) * STEP,
+        START_Y + (ROWS - 1) * STEP + STEP / 2
+    );
+
     // Goal walls
     ctx.strokeStyle = "#527b4a";
     ctx.lineWidth = 7;
@@ -430,7 +447,9 @@ function moveBall(x, y) {
 
     // GOAL
     if (isGoalPosition(x, y)) {
-        if (currentPlayer === 1) {
+        const winner = y === TOP_GOAL_Y ? 1 : 2;
+
+        if (winner === 1) {
             score1++;
         } else {
             score2++;
@@ -440,20 +459,18 @@ function moveBall(x, y) {
 
         gameOver = true;
 
-        const scorer = currentPlayer;
-
         document.getElementById("turnInfo").textContent =
-            "Player " + scorer + " scored!";
+            "Player " + winner + " wins the point!";
 
         draw();
 
         setTimeout(() => {
-            alert("GOAL! Player " + scorer + " scores!");
+            alert("GOAL! Player " + winner + " wins the point!");
 
             ball = { x: 4, y: 5 };
             lines = [];
 
-            currentPlayer = scorer === 1 ? 2 : 1;
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
             gameOver = false;
 
             updateTurn();
