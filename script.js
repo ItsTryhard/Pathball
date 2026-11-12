@@ -26,6 +26,7 @@ let score1 = 0;
 let score2 = 0;
 
 let lines = [];
+let visitedPoints = new Map();
 let gameOver = false;
 
 const COLORS = {
@@ -60,6 +61,7 @@ function newGame() {
     score2 = 0;
 
     lines = [];
+    visitedPoints = new Map([[`${ball.x},${ball.y}`, currentPlayer]]);
     gameOver = false;
 
     updateScore();
@@ -155,8 +157,9 @@ function draw() {
         ctx.stroke();
     }
 
-    // Goal backgrounds
-    ctx.fillStyle = "#a5c99a";
+    // Goal backgrounds show the opposing player's color.
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = COLORS[2];
 
     ctx.fillRect(
         START_X + GOAL_LEFT * STEP,
@@ -165,12 +168,14 @@ function draw() {
         STEP
     );
 
+    ctx.fillStyle = COLORS[1];
     ctx.fillRect(
         START_X + GOAL_LEFT * STEP,
         START_Y + (ROWS - 1) * STEP,
         (GOAL_RIGHT - GOAL_LEFT) * STEP,
         STEP
     );
+    ctx.globalAlpha = 1;
 
     // Goal walls
     ctx.strokeStyle = "#527b4a";
@@ -239,10 +244,11 @@ function draw() {
             if (!isInsideFieldOrGoal(x, y)) continue;
 
             const p = getPosition(x, y);
+            const firstPlayer = visitedPoints.get(`${x},${y}`);
 
             ctx.beginPath();
-            ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
-            ctx.fillStyle = "#58734f";
+            ctx.arc(p.x, p.y, firstPlayer ? 8 : 6, 0, Math.PI * 2);
+            ctx.fillStyle = firstPlayer ? COLORS[firstPlayer] : "#58734f";
             ctx.fill();
         }
     }
@@ -295,6 +301,14 @@ function hasUsedLineAt(x, y) {
 function isWallPosition(x, y) {
     // Left and right field walls
     if (x === 0 || x === COLS - 1) return true;
+
+    // Goal corners where the posts meet the field boundary
+    if (
+        (y === 0 || y === ROWS - 1) &&
+        (x === GOAL_LEFT || x === GOAL_RIGHT)
+    ) {
+        return true;
+    }
 
     // Top and bottom field walls, except goal openings
     if (y === 0 || y === ROWS - 1) {
@@ -410,6 +424,7 @@ function moveBall(x, y) {
 
     const oldX = ball.x;
     const oldY = ball.y;
+    const destinationKey = `${x},${y}`;
 
     // Bounce from walls or used paths
     const bounce =
@@ -427,10 +442,15 @@ function moveBall(x, y) {
 
     ball.x = x;
     ball.y = y;
+    if (!visitedPoints.has(destinationKey)) {
+        visitedPoints.set(destinationKey, currentPlayer);
+    }
 
     // GOAL
     if (isGoalPosition(x, y)) {
-        if (currentPlayer === 1) {
+        const winner = y === TOP_GOAL_Y ? 1 : 2;
+
+        if (winner === 1) {
             score1++;
         } else {
             score2++;
@@ -440,20 +460,19 @@ function moveBall(x, y) {
 
         gameOver = true;
 
-        const scorer = currentPlayer;
-
         document.getElementById("turnInfo").textContent =
-            "Player " + scorer + " scored!";
+            "Player " + winner + " wins the point!";
 
         draw();
 
         setTimeout(() => {
-            alert("GOAL! Player " + scorer + " scores!");
+            alert("GOAL! Player " + winner + " wins the point!");
 
             ball = { x: 4, y: 5 };
             lines = [];
 
-            currentPlayer = scorer === 1 ? 2 : 1;
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            visitedPoints = new Map([[`${ball.x},${ball.y}`, currentPlayer]]);
             gameOver = false;
 
             updateTurn();
