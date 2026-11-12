@@ -5,8 +5,8 @@ const gameScreen = document.getElementById("gameScreen");
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-const COLS = 9;       // 8 pól szerokości
-const ROWS = 11;      // 10 pól wysokości
+const COLS = 9;
+const ROWS = 11;
 
 const STEP = 90;
 const START_X = 90;
@@ -89,7 +89,7 @@ function isInsideFieldOrGoal(x, y) {
 
     if (y >= 0 && y < ROWS) return true;
 
-    // Górna bramka
+    // Top goal
     if (
         y >= TOP_GOAL_Y &&
         y < 0 &&
@@ -99,7 +99,7 @@ function isInsideFieldOrGoal(x, y) {
         return true;
     }
 
-    // Dolna bramka
+    // Bottom goal
     if (
         y > ROWS - 1 &&
         y <= BOTTOM_GOAL_Y &&
@@ -120,11 +120,10 @@ function draw() {
     ctx.fillStyle = "#dce9d5";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Field lines
+    // Horizontal field lines
     ctx.strokeStyle = "#78916f";
     ctx.lineWidth = 4;
 
-    // Horizontal lines
     for (let y = 0; y < ROWS; y++) {
         const p1 = getPosition(0, y);
         const p2 = getPosition(COLS - 1, y);
@@ -145,7 +144,7 @@ function draw() {
         ctx.stroke();
     }
 
-    // Vertical lines
+    // Vertical field lines
     for (let x = 0; x < COLS; x++) {
         const top = getPosition(x, 0);
         const bottom = getPosition(x, ROWS - 1);
@@ -160,14 +159,14 @@ function draw() {
     ctx.fillStyle = "#a5c99a";
 
     ctx.fillRect(
-        GOAL_LEFT * STEP + START_X,
+        START_X + GOAL_LEFT * STEP,
         START_Y - STEP,
         (GOAL_RIGHT - GOAL_LEFT) * STEP,
         STEP
     );
 
     ctx.fillRect(
-        GOAL_LEFT * STEP + START_X,
+        START_X + GOAL_LEFT * STEP,
         START_Y + (ROWS - 1) * STEP,
         (GOAL_RIGHT - GOAL_LEFT) * STEP,
         STEP
@@ -177,38 +176,46 @@ function draw() {
     ctx.strokeStyle = "#527b4a";
     ctx.lineWidth = 7;
 
-    // Top goal: side walls and back wall
+    // Top goal
     ctx.beginPath();
-    ctx.moveTo(getPosition(GOAL_LEFT, 0).x, START_Y);
-    ctx.lineTo(getPosition(GOAL_LEFT, TOP_GOAL_Y).x,
-               getPosition(GOAL_LEFT, TOP_GOAL_Y).y);
+    ctx.moveTo(START_X + GOAL_LEFT * STEP, START_Y);
+    ctx.lineTo(START_X + GOAL_LEFT * STEP, START_Y - STEP);
 
-    ctx.moveTo(getPosition(GOAL_RIGHT, 0).x, START_Y);
-    ctx.lineTo(getPosition(GOAL_RIGHT, TOP_GOAL_Y).x,
-               getPosition(GOAL_RIGHT, TOP_GOAL_Y).y);
+    ctx.moveTo(START_X + GOAL_RIGHT * STEP, START_Y);
+    ctx.lineTo(START_X + GOAL_RIGHT * STEP, START_Y - STEP);
 
-    ctx.moveTo(getPosition(GOAL_LEFT, TOP_GOAL_Y).x,
-               getPosition(GOAL_LEFT, TOP_GOAL_Y).y);
-    ctx.lineTo(getPosition(GOAL_RIGHT, TOP_GOAL_Y).x,
-               getPosition(GOAL_RIGHT, TOP_GOAL_Y).y);
+    ctx.moveTo(START_X + GOAL_LEFT * STEP, START_Y - STEP);
+    ctx.lineTo(START_X + GOAL_RIGHT * STEP, START_Y - STEP);
     ctx.stroke();
 
     // Bottom goal
     ctx.beginPath();
-    ctx.moveTo(getPosition(GOAL_LEFT, ROWS - 1).x,
-               getPosition(GOAL_LEFT, ROWS - 1).y);
-    ctx.lineTo(getPosition(GOAL_LEFT, BOTTOM_GOAL_Y).x,
-               getPosition(GOAL_LEFT, BOTTOM_GOAL_Y).y);
+    ctx.moveTo(
+        START_X + GOAL_LEFT * STEP,
+        START_Y + (ROWS - 1) * STEP
+    );
+    ctx.lineTo(
+        START_X + GOAL_LEFT * STEP,
+        START_Y + ROWS * STEP
+    );
 
-    ctx.moveTo(getPosition(GOAL_RIGHT, ROWS - 1).x,
-               getPosition(GOAL_RIGHT, ROWS - 1).y);
-    ctx.lineTo(getPosition(GOAL_RIGHT, BOTTOM_GOAL_Y).x,
-               getPosition(GOAL_RIGHT, BOTTOM_GOAL_Y).y);
+    ctx.moveTo(
+        START_X + GOAL_RIGHT * STEP,
+        START_Y + (ROWS - 1) * STEP
+    );
+    ctx.lineTo(
+        START_X + GOAL_RIGHT * STEP,
+        START_Y + ROWS * STEP
+    );
 
-    ctx.moveTo(getPosition(GOAL_LEFT, BOTTOM_GOAL_Y).x,
-               getPosition(GOAL_LEFT, BOTTOM_GOAL_Y).y);
-    ctx.lineTo(getPosition(GOAL_RIGHT, BOTTOM_GOAL_Y).x,
-               getPosition(GOAL_RIGHT, BOTTOM_GOAL_Y).y);
+    ctx.moveTo(
+        START_X + GOAL_LEFT * STEP,
+        START_Y + ROWS * STEP
+    );
+    ctx.lineTo(
+        START_X + GOAL_RIGHT * STEP,
+        START_Y + ROWS * STEP
+    );
     ctx.stroke();
 
     // Used paths
@@ -226,7 +233,7 @@ function draw() {
         ctx.stroke();
     });
 
-    // Grid points inside field and goals
+    // Grid points
     for (let y = TOP_GOAL_Y; y <= BOTTOM_GOAL_Y; y++) {
         for (let x = 0; x < COLS; x++) {
             if (!isInsideFieldOrGoal(x, y)) continue;
@@ -267,7 +274,12 @@ function hasLine(x1, y1, x2, y2) {
     const key = edgeKey(x1, y1, x2, y2);
 
     return lines.some(line =>
-        edgeKey(line.x1, line.y1, line.x2, line.y2) === key
+        edgeKey(
+            line.x1,
+            line.y1,
+            line.x2,
+            line.y2
+        ) === key
     );
 }
 
@@ -289,7 +301,25 @@ function isWallPosition(x, y) {
         return !(x >= GOAL_LEFT && x <= GOAL_RIGHT);
     }
 
-    // Back walls of goals
+    // Side walls of top goal
+    if (
+        y < 0 &&
+        y > TOP_GOAL_Y &&
+        (x === GOAL_LEFT || x === GOAL_RIGHT)
+    ) {
+        return true;
+    }
+
+    // Side walls of bottom goal
+    if (
+        y > ROWS - 1 &&
+        y < BOTTOM_GOAL_Y &&
+        (x === GOAL_LEFT || x === GOAL_RIGHT)
+    ) {
+        return true;
+    }
+
+    // Back walls
     if (y === TOP_GOAL_Y || y === BOTTOM_GOAL_Y) {
         return true;
     }
@@ -298,27 +328,51 @@ function isWallPosition(x, y) {
 }
 
 function isAlongSameWall(oldX, oldY, x, y) {
-    // Cannot walk along left wall
+    // Left and right field walls
     if (oldX === 0 && x === 0) return true;
-
-    // Cannot walk along right wall
     if (oldX === COLS - 1 && x === COLS - 1) return true;
 
-    // Cannot walk along top wall
-    if (oldY === 0 && y === 0 &&
+    // Top field wall
+    if (
+        oldY === 0 && y === 0 &&
         !(oldX >= GOAL_LEFT && oldX <= GOAL_RIGHT &&
-          x >= GOAL_LEFT && x <= GOAL_RIGHT)) {
+          x >= GOAL_LEFT && x <= GOAL_RIGHT)
+    ) {
         return true;
     }
 
-    // Cannot walk along bottom wall
-    if (oldY === ROWS - 1 && y === ROWS - 1 &&
+    // Bottom field wall
+    if (
+        oldY === ROWS - 1 && y === ROWS - 1 &&
         !(oldX >= GOAL_LEFT && oldX <= GOAL_RIGHT &&
-          x >= GOAL_LEFT && x <= GOAL_RIGHT)) {
+          x >= GOAL_LEFT && x <= GOAL_RIGHT)
+    ) {
         return true;
     }
 
-    // Cannot walk along back wall of goal
+    // Top goal left and right walls
+    if (
+        oldX === GOAL_LEFT && x === GOAL_LEFT &&
+        oldY < 0 && y < 0
+    ) return true;
+
+    if (
+        oldX === GOAL_RIGHT && x === GOAL_RIGHT &&
+        oldY < 0 && y < 0
+    ) return true;
+
+    // Bottom goal left and right walls
+    if (
+        oldX === GOAL_LEFT && x === GOAL_LEFT &&
+        oldY > ROWS - 1 && y > ROWS - 1
+    ) return true;
+
+    if (
+        oldX === GOAL_RIGHT && x === GOAL_RIGHT &&
+        oldY > ROWS - 1 && y > ROWS - 1
+    ) return true;
+
+    // Goal back walls
     if (
         (oldY === TOP_GOAL_Y && y === TOP_GOAL_Y) ||
         (oldY === BOTTOM_GOAL_Y && y === BOTTOM_GOAL_Y)
@@ -357,7 +411,10 @@ function moveBall(x, y) {
     const oldX = ball.x;
     const oldY = ball.y;
 
-    const bounce = hasUsedLineAt(x, y) || isWallPosition(x, y);
+    // Bounce from walls or used paths
+    const bounce =
+        hasUsedLineAt(x, y) ||
+        isWallPosition(x, y);
 
     // Save movement
     lines.push({
@@ -371,7 +428,7 @@ function moveBall(x, y) {
     ball.x = x;
     ball.y = y;
 
-    // GOAL: reached the back wall
+    // GOAL
     if (isGoalPosition(x, y)) {
         if (currentPlayer === 1) {
             score1++;
@@ -421,10 +478,12 @@ canvas.addEventListener("click", function(event) {
     const rect = canvas.getBoundingClientRect();
 
     const mouseX =
-        (event.clientX - rect.left) * canvas.width / rect.width;
+        (event.clientX - rect.left) *
+        canvas.width / rect.width;
 
     const mouseY =
-        (event.clientY - rect.top) * canvas.height / rect.height;
+        (event.clientY - rect.top) *
+        canvas.height / rect.height;
 
     const x = Math.round((mouseX - START_X) / STEP);
     const y = Math.round((mouseY - START_Y) / STEP);
