@@ -86,6 +86,13 @@ function isGoalPosition(x, y) {
     );
 }
 
+function isGoalBackCorner(x, y) {
+    return (
+        (y === TOP_GOAL_Y || y === BOTTOM_GOAL_Y) &&
+        (x === GOAL_LEFT || x === GOAL_RIGHT)
+    );
+}
+
 function isInsideFieldOrGoal(x, y) {
     if (x < 0 || x >= COLS) return false;
 
@@ -431,6 +438,7 @@ function isLegalMove(x, y) {
     return (
         !gameOver &&
         isInsideFieldOrGoal(x, y) &&
+        !isGoalBackCorner(x, y) &&
         !isAlongSameWall(ball.x, ball.y, x, y) &&
         !hasLine(ball.x, ball.y, x, y)
     );
