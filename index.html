@@ -1,0 +1,44 @@
+
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moje Warcaby</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <h1>♟ MOJE WARCABY</h1>
+        <p>Graj ze znajomymi przez internet!</p>
+    </header>
+
+    <main>
+        <section class="menu">
+            <h2>Menu główne</h2>
+
+            <button onclick="utworzPokoj()">
+                Utwórz pokój
+            </button>
+
+            <div class="join">
+                <input id="kodPokoju"
+                       placeholder="Wpisz kod pokoju">
+
+                <button onclick="dolaczDoPokoju()">
+                    Dołącz do pokoju
+                </button>
+            </div>
+
+            <p id="komunikat"></p>
+        </section>
+    </main>
+
+    <footer>
+        <p>Moje Warcaby © 2026</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
