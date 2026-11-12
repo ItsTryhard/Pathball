@@ -26,6 +26,7 @@ let score1 = 0;
 let score2 = 0;
 
 let lines = [];
+let visitedPoints = new Map();
 let gameOver = false;
 
 const COLORS = {
@@ -60,6 +61,7 @@ function newGame() {
     score2 = 0;
 
     lines = [];
+    visitedPoints = new Map([[`${ball.x},${ball.y}`, currentPlayer]]);
     gameOver = false;
 
     updateScore();
@@ -155,8 +157,9 @@ function draw() {
         ctx.stroke();
     }
 
-    // Goal backgrounds
-    ctx.fillStyle = "#a5c99a";
+    // Goal backgrounds show the opposing player's color.
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = COLORS[2];
 
     ctx.fillRect(
         START_X + GOAL_LEFT * STEP,
@@ -165,29 +168,14 @@ function draw() {
         STEP
     );
 
+    ctx.fillStyle = COLORS[1];
     ctx.fillRect(
         START_X + GOAL_LEFT * STEP,
         START_Y + (ROWS - 1) * STEP,
         (GOAL_RIGHT - GOAL_LEFT) * STEP,
         STEP
     );
-
-    // Goal owners
-    ctx.font = "bold 22px Arial";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillStyle = COLORS[1];
-    ctx.fillText(
-        "PLAYER 1 GOAL",
-        START_X + ((GOAL_LEFT + GOAL_RIGHT) / 2) * STEP,
-        START_Y - STEP / 2
-    );
-    ctx.fillStyle = COLORS[2];
-    ctx.fillText(
-        "PLAYER 2 GOAL",
-        START_X + ((GOAL_LEFT + GOAL_RIGHT) / 2) * STEP,
-        START_Y + (ROWS - 1) * STEP + STEP / 2
-    );
+    ctx.globalAlpha = 1;
 
     // Goal walls
     ctx.strokeStyle = "#527b4a";
@@ -256,10 +244,11 @@ function draw() {
             if (!isInsideFieldOrGoal(x, y)) continue;
 
             const p = getPosition(x, y);
+            const firstPlayer = visitedPoints.get(`${x},${y}`);
 
             ctx.beginPath();
-            ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
-            ctx.fillStyle = "#58734f";
+            ctx.arc(p.x, p.y, firstPlayer ? 8 : 6, 0, Math.PI * 2);
+            ctx.fillStyle = firstPlayer ? COLORS[firstPlayer] : "#58734f";
             ctx.fill();
         }
     }
@@ -427,6 +416,7 @@ function moveBall(x, y) {
 
     const oldX = ball.x;
     const oldY = ball.y;
+    const destinationKey = `${x},${y}`;
 
     // Bounce from walls or used paths
     const bounce =
@@ -444,6 +434,9 @@ function moveBall(x, y) {
 
     ball.x = x;
     ball.y = y;
+    if (!visitedPoints.has(destinationKey)) {
+        visitedPoints.set(destinationKey, currentPlayer);
+    }
 
     // GOAL
     if (isGoalPosition(x, y)) {
@@ -471,6 +464,7 @@ function moveBall(x, y) {
             lines = [];
 
             currentPlayer = currentPlayer === 1 ? 2 : 1;
+            visitedPoints = new Map([[`${ball.x},${ball.y}`, currentPlayer]]);
             gameOver = false;
 
             updateTurn();
