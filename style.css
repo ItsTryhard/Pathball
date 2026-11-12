@@ -115,7 +115,7 @@ button:hover {
 
 .fieldContainer {
     width: min(94vw, 420px);
-    aspect-ratio: 900 / 1260;
+    aspect-ratio: 900 / 1440;
     flex: 0 0 auto;
     margin: 10px auto;
     background: #dce9d5;
