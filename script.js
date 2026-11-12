@@ -380,23 +380,27 @@ function isAlongSameWall(oldX, oldY, x, y) {
     // Top goal left and right walls
     if (
         oldX === GOAL_LEFT && x === GOAL_LEFT &&
-        oldY < 0 && y < 0
+        oldY <= 0 && y <= 0 &&
+        (oldY < 0 || y < 0)
     ) return true;
 
     if (
         oldX === GOAL_RIGHT && x === GOAL_RIGHT &&
-        oldY < 0 && y < 0
+        oldY <= 0 && y <= 0 &&
+        (oldY < 0 || y < 0)
     ) return true;
 
     // Bottom goal left and right walls
     if (
         oldX === GOAL_LEFT && x === GOAL_LEFT &&
-        oldY > ROWS - 1 && y > ROWS - 1
+        oldY >= ROWS - 1 && y >= ROWS - 1 &&
+        (oldY > ROWS - 1 || y > ROWS - 1)
     ) return true;
 
     if (
         oldX === GOAL_RIGHT && x === GOAL_RIGHT &&
-        oldY > ROWS - 1 && y > ROWS - 1
+        oldY >= ROWS - 1 && y >= ROWS - 1 &&
+        (oldY > ROWS - 1 || y > ROWS - 1)
     ) return true;
 
     // Goal back walls
