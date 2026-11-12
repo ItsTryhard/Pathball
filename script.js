@@ -80,8 +80,8 @@ function getPosition(x, y) {
 
 function isGoalPosition(x, y) {
     return (
-        x >= GOAL_LEFT &&
-        x <= GOAL_RIGHT &&
+        x > GOAL_LEFT &&
+        x < GOAL_RIGHT &&
         (y === TOP_GOAL_Y || y === BOTTOM_GOAL_Y)
     );
 }
@@ -253,6 +253,19 @@ function draw() {
         }
     }
 
+    // Highlight legal destinations for the current player
+    getLegalMoves().forEach(({ x, y }) => {
+        const p = getPosition(x, y);
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 16, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(34, 197, 94, 0.3)";
+        ctx.fill();
+        ctx.strokeStyle = "#15803d";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+    });
+
     // Ball
     const p = getPosition(ball.x, ball.y);
 
@@ -399,28 +412,71 @@ function isAlongSameWall(oldX, oldY, x, y) {
 
 // MOVE BALL
 
-function moveBall(x, y) {
-    if (gameOver) return;
-
+function isLegalMove(x, y) {
     const dx = x - ball.x;
     const dy = y - ball.y;
 
-    // Only neighboring points
     if (
         Math.abs(dx) > 1 ||
         Math.abs(dy) > 1 ||
         (dx === 0 && dy === 0)
     ) {
-        return;
+        return false;
     }
 
-    if (!isInsideFieldOrGoal(x, y)) return;
+    return (
+        !gameOver &&
+        isInsideFieldOrGoal(x, y) &&
+        !isAlongSameWall(ball.x, ball.y, x, y) &&
+        !hasLine(ball.x, ball.y, x, y)
+    );
+}
 
-    // Cannot walk along walls
-    if (isAlongSameWall(ball.x, ball.y, x, y)) return;
+function getLegalMoves() {
+    const moves = [];
 
-    // Cannot use the same line twice
-    if (hasLine(ball.x, ball.y, x, y)) return;
+    for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+            const x = ball.x + dx;
+            const y = ball.y + dy;
+
+            if (isLegalMove(x, y)) {
+                moves.push({ x, y });
+            }
+        }
+    }
+
+    return moves;
+}
+
+function finishPoint(winner, message) {
+    if (winner === 1) {
+        score1++;
+    } else {
+        score2++;
+    }
+
+    updateScore();
+    gameOver = true;
+    document.getElementById("turnInfo").textContent = message;
+    draw();
+
+    setTimeout(() => {
+        alert(message);
+
+        ball = { x: 4, y: 5 };
+        lines = [];
+        currentPlayer = currentPlayer === 1 ? 2 : 1;
+        visitedPoints = new Map([[`${ball.x},${ball.y}`, currentPlayer]]);
+        gameOver = false;
+
+        updateTurn();
+        draw();
+    }, 300);
+}
+
+function moveBall(x, y) {
+    if (!isLegalMove(x, y)) return;
 
     const oldX = ball.x;
     const oldY = ball.y;
@@ -449,42 +505,24 @@ function moveBall(x, y) {
     // GOAL
     if (isGoalPosition(x, y)) {
         const winner = y === TOP_GOAL_Y ? 1 : 2;
-
-        if (winner === 1) {
-            score1++;
-        } else {
-            score2++;
-        }
-
-        updateScore();
-
-        gameOver = true;
-
-        document.getElementById("turnInfo").textContent =
-            "Player " + winner + " wins the point!";
-
-        draw();
-
-        setTimeout(() => {
-            alert("GOAL! Player " + winner + " wins the point!");
-
-            ball = { x: 4, y: 5 };
-            lines = [];
-
-            currentPlayer = currentPlayer === 1 ? 2 : 1;
-            visitedPoints = new Map([[`${ball.x},${ball.y}`, currentPlayer]]);
-            gameOver = false;
-
-            updateTurn();
-            draw();
-        }, 300);
-
+        finishPoint(winner, "GOAL! Player " + winner + " wins the point!");
         return;
     }
 
     // Bounce or change turn
     if (!bounce) {
         currentPlayer = currentPlayer === 1 ? 2 : 1;
+    }
+
+    if (getLegalMoves().length === 0) {
+        const loser = currentPlayer;
+        const winner = loser === 1 ? 2 : 1;
+        finishPoint(
+            winner,
+            "Player " + winner + " wins the point! Player " +
+                loser + " has no legal moves."
+        );
+        return;
     }
 
     updateTurn();
