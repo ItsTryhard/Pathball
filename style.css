@@ -59,6 +59,14 @@ button:hover {
     background: #1d4ed8;
 }
 
+/* GAME SCREEN */
+
+#gameScreen {
+    justify-content: flex-start;
+    min-height: 100vh;
+    padding: 10px 12px 30px;
+}
+
 .gameLogo {
     font-size: 38px;
     margin: 5px;
@@ -66,9 +74,9 @@ button:hover {
 
 .score {
     display: flex;
-    gap: 30px;
+    gap: 20px;
     justify-content: center;
-    margin: 15px;
+    margin: 10px;
 }
 
 .player {
@@ -98,7 +106,7 @@ button:hover {
 }
 
 #turnInfo {
-    margin: 12px;
+    margin: 8px;
     padding: 12px 25px;
     background: #263449;
     border-radius: 10px;
@@ -106,7 +114,9 @@ button:hover {
 }
 
 .fieldContainer {
-    width: min(94vw, 520px);
+    width: min(94vw, 420px);
+    aspect-ratio: 900 / 1280;
+    flex: 0 0 auto;
     margin: 10px auto;
     background: #dce9d5;
     border: 5px solid #647c59;
@@ -114,10 +124,10 @@ button:hover {
     overflow: hidden;
 }
 
-canvas {
+#gameCanvas {
     display: block;
     width: 100%;
-    height: auto;
+    height: 100%;
     touch-action: manipulation;
 }
 
@@ -153,7 +163,7 @@ canvas {
     }
 
     .score {
-        gap: 15px;
+        gap: 12px;
     }
 
     .player {
