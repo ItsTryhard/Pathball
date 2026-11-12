@@ -5,22 +5,20 @@ const gameScreen = document.getElementById("gameScreen");
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-const COLS = 9;
-const ROWS = 13;
+const COLS = 9; // 8 pól szerokości
+const ROWS = 11; // 10 pól wysokości
 
 const STEP = 90;
 const START_X = 90;
-const START_Y = 100;
+const START_Y = 180;
 
-let ball = { x: 4, y: 6 };
-
+let ball = { x: 4, y: 5 };
 let currentPlayer = 1;
 
 let score1 = 0;
 let score2 = 0;
 
 let lines = [];
-
 let gameOver = false;
 
 const COLORS = {
@@ -33,7 +31,6 @@ const COLORS = {
 function playFriend() {
     mainMenu.classList.add("hidden");
     gameScreen.classList.remove("hidden");
-
     newGame();
 }
 
@@ -49,15 +46,11 @@ function backToMenu() {
 // NEW GAME
 
 function newGame() {
-    ball = { x: 4, y: 6 };
-
+    ball = { x: 4, y: 5 };
     currentPlayer = 1;
-
     score1 = 0;
     score2 = 0;
-
     lines = [];
-
     gameOver = false;
 
     updateScore();
@@ -65,7 +58,7 @@ function newGame() {
     draw();
 }
 
-// DRAWING
+// POSITION
 
 function getPosition(x, y) {
     return {
@@ -74,64 +67,79 @@ function getPosition(x, y) {
     };
 }
 
+// DRAWING
+
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Background
-
     ctx.fillStyle = "#dce9d5";
-    ctx.fillRect(0, 0, 900, 1280);
-
-    // Field lines
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.strokeStyle = "#78916f";
     ctx.lineWidth = 4;
 
-    // Horizontal lines
-
+    // Horizontal field lines
     for (let y = 0; y < ROWS; y++) {
+        const p1 = getPosition(0, y);
+        const p2 = getPosition(COLS - 1, y);
+
         ctx.beginPath();
 
-        for (let x = 0; x < COLS; x++) {
-            const p = getPosition(x, y);
+        // Leave openings for the goals
+        if (y === 0 || y === ROWS - 1) {
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(getPosition(3, y).x, p1.y);
 
-            if (x === 0) ctx.moveTo(p.x, p.y);
-            else ctx.lineTo(p.x, p.y);
+            ctx.moveTo(getPosition(5, y).x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+        } else {
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
         }
 
         ctx.stroke();
     }
 
-    // Vertical lines
-
+    // Vertical field lines
     for (let x = 0; x < COLS; x++) {
         ctx.beginPath();
 
-        for (let y = 0; y < ROWS; y++) {
-            const p = getPosition(x, y);
+        const top = getPosition(x, 0);
+        const bottom = getPosition(x, ROWS - 1);
 
-            if (y === 0) ctx.moveTo(p.x, p.y);
-            else ctx.lineTo(p.x, p.y);
-        }
+        ctx.moveTo(top.x, top.y);
+        ctx.lineTo(bottom.x, bottom.y);
 
         ctx.stroke();
     }
 
-    // Goals
-
-    ctx.fillStyle = "#a5c99a";
-
-    ctx.fillRect(270, 0, 360, 100);
-    ctx.fillRect(270, 1180, 360, 100);
-
+    // Goals: 2 fields wide, 1 field deep
     ctx.strokeStyle = "#527b4a";
     ctx.lineWidth = 7;
 
-    ctx.strokeRect(270, 0, 360, 100);
-    ctx.strokeRect(270, 1180, 360, 100);
+    // Top goal
+    ctx.beginPath();
+    ctx.moveTo(360, 180);
+    ctx.lineTo(360, 90);
+    ctx.lineTo(540, 90);
+    ctx.lineTo(540, 180);
+    ctx.stroke();
+
+    // Bottom goal
+    ctx.beginPath();
+    ctx.moveTo(360, 1080);
+    ctx.lineTo(360, 1170);
+    ctx.lineTo(540, 1170);
+    ctx.lineTo(540, 1080);
+    ctx.stroke();
+
+    // Goal background
+    ctx.fillStyle = "#a5c99a";
+    ctx.fillRect(363, 93, 174, 84);
+    ctx.fillRect(363, 1083, 174, 84);
 
     // Used paths
-
     lines.forEach(line => {
         const a = getPosition(line.x1, line.y1);
         const b = getPosition(line.x2, line.y2);
@@ -147,7 +155,6 @@ function draw() {
     });
 
     // Grid points
-
     for (let y = 0; y < ROWS; y++) {
         for (let x = 0; x < COLS; x++) {
             const p = getPosition(x, y);
@@ -161,7 +168,6 @@ function draw() {
     }
 
     // Ball
-
     const p = getPosition(ball.x, ball.y);
 
     ctx.beginPath();
@@ -180,7 +186,6 @@ function draw() {
 function edgeKey(x1, y1, x2, y2) {
     const a = `${x1},${y1}`;
     const b = `${x2},${y2}`;
-
     return [a, b].sort().join("|");
 }
 
@@ -188,10 +193,7 @@ function hasLine(x1, y1, x2, y2) {
     const key = edgeKey(x1, y1, x2, y2);
 
     return lines.some(line =>
-        edgeKey(
-            line.x1, line.y1,
-            line.x2, line.y2
-        ) === key
+        edgeKey(line.x1, line.y1, line.x2, line.y2) === key
     );
 }
 
@@ -205,13 +207,10 @@ function hasUsedLineAt(x, y) {
 // MOVE BALL
 
 function moveBall(x, y) {
-
     if (gameOver) return;
 
     const dx = x - ball.x;
     const dy = y - ball.y;
-
-    // Must move to a neighboring point
 
     if (
         Math.abs(dx) > 1 ||
@@ -221,16 +220,12 @@ function moveBall(x, y) {
         return;
     }
 
-    // Cannot leave the field
-
     if (
         x < 0 || x >= COLS ||
         y < 0 || y >= ROWS
     ) {
         return;
     }
-
-    // Cannot use the same line twice
 
     if (hasLine(ball.x, ball.y, x, y)) {
         return;
@@ -239,11 +234,7 @@ function moveBall(x, y) {
     const oldX = ball.x;
     const oldY = ball.y;
 
-    // Check whether destination already had a used line
-
     const bounce = hasUsedLineAt(x, y);
-
-    // Save movement
 
     lines.push({
         x1: oldX,
@@ -256,10 +247,8 @@ function moveBall(x, y) {
     ball.x = x;
     ball.y = y;
 
-    // Goal!
-
+    // Goal
     if (x === 4 && (y === 0 || y === ROWS - 1)) {
-
         if (currentPlayer === 1) {
             score1++;
         } else {
@@ -267,7 +256,6 @@ function moveBall(x, y) {
         }
 
         updateScore();
-
         gameOver = true;
 
         document.getElementById("turnInfo").textContent =
@@ -275,25 +263,25 @@ function moveBall(x, y) {
 
         draw();
 
-        setTimeout(() => {
-            alert("GOAL! Player " + currentPlayer + " scores!");
+        const scorer = currentPlayer;
 
-            ball = { x: 4, y: 6 };
+        setTimeout(() => {
+            alert("GOAL! Player " + scorer + " scores!");
+
+            ball = { x: 4, y: 5 };
             lines = [];
-            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            currentPlayer = scorer === 1 ? 2 : 1;
 
             gameOver = false;
 
             updateTurn();
             draw();
-
         }, 300);
 
         return;
     }
 
-    // Bounce off walls or used paths
-
+    // Bounce
     const wall =
         x === 0 ||
         x === COLS - 1 ||
@@ -311,7 +299,6 @@ function moveBall(x, y) {
 // CLICK ON CANVAS
 
 canvas.addEventListener("click", function(event) {
-
     const rect = canvas.getBoundingClientRect();
 
     const mouseX =
