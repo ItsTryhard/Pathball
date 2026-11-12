@@ -291,8 +291,8 @@ function draw() {
             (ballAnimation.toX - ballAnimation.fromX) * easedProgress;
         ballY = ballAnimation.fromY +
             (ballAnimation.toY - ballAnimation.fromY) * easedProgress;
-        ballScale = 1 + 0.7 * lift;
-        liftHeight = 32 * lift;
+        ballScale = 1 + 0.4 * lift;
+        liftHeight = 22 * lift;
     }
 
     const p = getPosition(ballX, ballY);
