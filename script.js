@@ -5,12 +5,19 @@ const gameScreen = document.getElementById("gameScreen");
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-const COLS = 9; // 8 pól szerokości
-const ROWS = 11; // 10 pól wysokości
+const COLS = 9;       // 8 pól szerokości
+const ROWS = 11;      // 10 pól wysokości
 
 const STEP = 90;
 const START_X = 90;
 const START_Y = 180;
+
+const GOAL_LEFT = 3;
+const GOAL_RIGHT = 5;
+const GOAL_DEPTH = 1;
+
+const TOP_GOAL_Y = -GOAL_DEPTH;
+const BOTTOM_GOAL_Y = ROWS - 1 + GOAL_DEPTH;
 
 let ball = { x: 4, y: 5 };
 let currentPlayer = 1;
@@ -69,31 +76,66 @@ function getPosition(x, y) {
     };
 }
 
+function isGoalPosition(x, y) {
+    return (
+        x >= GOAL_LEFT &&
+        x <= GOAL_RIGHT &&
+        (y === TOP_GOAL_Y || y === BOTTOM_GOAL_Y)
+    );
+}
+
+function isInsideFieldOrGoal(x, y) {
+    if (x < 0 || x >= COLS) return false;
+
+    if (y >= 0 && y < ROWS) return true;
+
+    // Górna bramka
+    if (
+        y >= TOP_GOAL_Y &&
+        y < 0 &&
+        x >= GOAL_LEFT &&
+        x <= GOAL_RIGHT
+    ) {
+        return true;
+    }
+
+    // Dolna bramka
+    if (
+        y > ROWS - 1 &&
+        y <= BOTTOM_GOAL_Y &&
+        x >= GOAL_LEFT &&
+        x <= GOAL_RIGHT
+    ) {
+        return true;
+    }
+
+    return false;
+}
+
 // DRAWING
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Background
     ctx.fillStyle = "#dce9d5";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // Field lines
     ctx.strokeStyle = "#78916f";
     ctx.lineWidth = 4;
 
-    // Horizontal field lines
+    // Horizontal lines
     for (let y = 0; y < ROWS; y++) {
         const p1 = getPosition(0, y);
         const p2 = getPosition(COLS - 1, y);
 
         ctx.beginPath();
 
-        // Openings for goals
         if (y === 0 || y === ROWS - 1) {
             ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(getPosition(3, y).x, p1.y);
+            ctx.lineTo(getPosition(GOAL_LEFT, y).x, p1.y);
 
-            ctx.moveTo(getPosition(5, y).x, p1.y);
+            ctx.moveTo(getPosition(GOAL_RIGHT, y).x, p1.y);
             ctx.lineTo(p2.x, p2.y);
         } else {
             ctx.moveTo(p1.x, p1.y);
@@ -103,7 +145,7 @@ function draw() {
         ctx.stroke();
     }
 
-    // Vertical field lines
+    // Vertical lines
     for (let x = 0; x < COLS; x++) {
         const top = getPosition(x, 0);
         const bottom = getPosition(x, ROWS - 1);
@@ -114,29 +156,59 @@ function draw() {
         ctx.stroke();
     }
 
-    // Goals: 2 fields wide, 1 field deep
-
+    // Goal backgrounds
     ctx.fillStyle = "#a5c99a";
-    ctx.fillRect(363, 93, 174, 84);
-    ctx.fillRect(363, 1083, 174, 84);
 
+    ctx.fillRect(
+        GOAL_LEFT * STEP + START_X,
+        START_Y - STEP,
+        (GOAL_RIGHT - GOAL_LEFT) * STEP,
+        STEP
+    );
+
+    ctx.fillRect(
+        GOAL_LEFT * STEP + START_X,
+        START_Y + (ROWS - 1) * STEP,
+        (GOAL_RIGHT - GOAL_LEFT) * STEP,
+        STEP
+    );
+
+    // Goal walls
     ctx.strokeStyle = "#527b4a";
     ctx.lineWidth = 7;
 
-    // Top goal
+    // Top goal: side walls and back wall
     ctx.beginPath();
-    ctx.moveTo(360, 180);
-    ctx.lineTo(360, 90);
-    ctx.lineTo(540, 90);
-    ctx.lineTo(540, 180);
+    ctx.moveTo(getPosition(GOAL_LEFT, 0).x, START_Y);
+    ctx.lineTo(getPosition(GOAL_LEFT, TOP_GOAL_Y).x,
+               getPosition(GOAL_LEFT, TOP_GOAL_Y).y);
+
+    ctx.moveTo(getPosition(GOAL_RIGHT, 0).x, START_Y);
+    ctx.lineTo(getPosition(GOAL_RIGHT, TOP_GOAL_Y).x,
+               getPosition(GOAL_RIGHT, TOP_GOAL_Y).y);
+
+    ctx.moveTo(getPosition(GOAL_LEFT, TOP_GOAL_Y).x,
+               getPosition(GOAL_LEFT, TOP_GOAL_Y).y);
+    ctx.lineTo(getPosition(GOAL_RIGHT, TOP_GOAL_Y).x,
+               getPosition(GOAL_RIGHT, TOP_GOAL_Y).y);
     ctx.stroke();
 
     // Bottom goal
     ctx.beginPath();
-    ctx.moveTo(360, 1080);
-    ctx.lineTo(360, 1170);
-    ctx.lineTo(540, 1170);
-    ctx.lineTo(540, 1080);
+    ctx.moveTo(getPosition(GOAL_LEFT, ROWS - 1).x,
+               getPosition(GOAL_LEFT, ROWS - 1).y);
+    ctx.lineTo(getPosition(GOAL_LEFT, BOTTOM_GOAL_Y).x,
+               getPosition(GOAL_LEFT, BOTTOM_GOAL_Y).y);
+
+    ctx.moveTo(getPosition(GOAL_RIGHT, ROWS - 1).x,
+               getPosition(GOAL_RIGHT, ROWS - 1).y);
+    ctx.lineTo(getPosition(GOAL_RIGHT, BOTTOM_GOAL_Y).x,
+               getPosition(GOAL_RIGHT, BOTTOM_GOAL_Y).y);
+
+    ctx.moveTo(getPosition(GOAL_LEFT, BOTTOM_GOAL_Y).x,
+               getPosition(GOAL_LEFT, BOTTOM_GOAL_Y).y);
+    ctx.lineTo(getPosition(GOAL_RIGHT, BOTTOM_GOAL_Y).x,
+               getPosition(GOAL_RIGHT, BOTTOM_GOAL_Y).y);
     ctx.stroke();
 
     // Used paths
@@ -154,20 +226,21 @@ function draw() {
         ctx.stroke();
     });
 
-    // Grid points
-    for (let y = 0; y < ROWS; y++) {
+    // Grid points inside field and goals
+    for (let y = TOP_GOAL_Y; y <= BOTTOM_GOAL_Y; y++) {
         for (let x = 0; x < COLS; x++) {
+            if (!isInsideFieldOrGoal(x, y)) continue;
+
             const p = getPosition(x, y);
 
             ctx.beginPath();
             ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
-
             ctx.fillStyle = "#58734f";
             ctx.fill();
         }
     }
 
-    // Ball - color depends on current player
+    // Ball
     const p = getPosition(ball.x, ball.y);
 
     ctx.beginPath();
@@ -194,12 +267,7 @@ function hasLine(x1, y1, x2, y2) {
     const key = edgeKey(x1, y1, x2, y2);
 
     return lines.some(line =>
-        edgeKey(
-            line.x1,
-            line.y1,
-            line.x2,
-            line.y2
-        ) === key
+        edgeKey(line.x1, line.y1, line.x2, line.y2) === key
     );
 }
 
@@ -210,6 +278,57 @@ function hasUsedLineAt(x, y) {
     );
 }
 
+// WALLS
+
+function isWallPosition(x, y) {
+    // Left and right field walls
+    if (x === 0 || x === COLS - 1) return true;
+
+    // Top and bottom field walls, except goal openings
+    if (y === 0 || y === ROWS - 1) {
+        return !(x >= GOAL_LEFT && x <= GOAL_RIGHT);
+    }
+
+    // Back walls of goals
+    if (y === TOP_GOAL_Y || y === BOTTOM_GOAL_Y) {
+        return true;
+    }
+
+    return false;
+}
+
+function isAlongSameWall(oldX, oldY, x, y) {
+    // Cannot walk along left wall
+    if (oldX === 0 && x === 0) return true;
+
+    // Cannot walk along right wall
+    if (oldX === COLS - 1 && x === COLS - 1) return true;
+
+    // Cannot walk along top wall
+    if (oldY === 0 && y === 0 &&
+        !(oldX >= GOAL_LEFT && oldX <= GOAL_RIGHT &&
+          x >= GOAL_LEFT && x <= GOAL_RIGHT)) {
+        return true;
+    }
+
+    // Cannot walk along bottom wall
+    if (oldY === ROWS - 1 && y === ROWS - 1 &&
+        !(oldX >= GOAL_LEFT && oldX <= GOAL_RIGHT &&
+          x >= GOAL_LEFT && x <= GOAL_RIGHT)) {
+        return true;
+    }
+
+    // Cannot walk along back wall of goal
+    if (
+        (oldY === TOP_GOAL_Y && y === TOP_GOAL_Y) ||
+        (oldY === BOTTOM_GOAL_Y && y === BOTTOM_GOAL_Y)
+    ) {
+        return true;
+    }
+
+    return false;
+}
+
 // MOVE BALL
 
 function moveBall(x, y) {
@@ -218,7 +337,7 @@ function moveBall(x, y) {
     const dx = x - ball.x;
     const dy = y - ball.y;
 
-    // Must move to a neighboring point
+    // Only neighboring points
     if (
         Math.abs(dx) > 1 ||
         Math.abs(dy) > 1 ||
@@ -227,34 +346,18 @@ function moveBall(x, y) {
         return;
     }
 
-    // Cannot leave the field
-    if (
-        x < 0 || x >= COLS ||
-        y < 0 || y >= ROWS
-    ) {
-        return;
-    }
+    if (!isInsideFieldOrGoal(x, y)) return;
 
-    // Cannot move along the same outer wall
-    if (
-        (ball.x === 0 && x === 0) ||
-        (ball.x === COLS - 1 && x === COLS - 1) ||
-        (ball.y === 0 && y === 0) ||
-        (ball.y === ROWS - 1 && y === ROWS - 1)
-    ) {
-        return;
-    }
+    // Cannot walk along walls
+    if (isAlongSameWall(ball.x, ball.y, x, y)) return;
 
     // Cannot use the same line twice
-    if (hasLine(ball.x, ball.y, x, y)) {
-        return;
-    }
+    if (hasLine(ball.x, ball.y, x, y)) return;
 
     const oldX = ball.x;
     const oldY = ball.y;
 
-    // Check if destination already has used lines
-    const bounce = hasUsedLineAt(x, y);
+    const bounce = hasUsedLineAt(x, y) || isWallPosition(x, y);
 
     // Save movement
     lines.push({
@@ -268,8 +371,8 @@ function moveBall(x, y) {
     ball.x = x;
     ball.y = y;
 
-    // GOAL - piłka musi dotrzeć do tylnej ściany bramki
-    if (x >= 3 && x <= 5 && (y === -1 || y === ROWS)) {
+    // GOAL: reached the back wall
+    if (isGoalPosition(x, y)) {
         if (currentPlayer === 1) {
             score1++;
         } else {
@@ -294,7 +397,6 @@ function moveBall(x, y) {
             lines = [];
 
             currentPlayer = scorer === 1 ? 2 : 1;
-
             gameOver = false;
 
             updateTurn();
@@ -304,14 +406,8 @@ function moveBall(x, y) {
         return;
     }
 
-    // Bounce off walls or used paths
-    const wall =
-        x === 0 ||
-        x === COLS - 1 ||
-        y === 0 ||
-        y === ROWS - 1;
-
-    if (!bounce && !wall) {
+    // Bounce or change turn
+    if (!bounce) {
         currentPlayer = currentPlayer === 1 ? 2 : 1;
     }
 
@@ -325,22 +421,15 @@ canvas.addEventListener("click", function(event) {
     const rect = canvas.getBoundingClientRect();
 
     const mouseX =
-        (event.clientX - rect.left) *
-        canvas.width / rect.width;
+        (event.clientX - rect.left) * canvas.width / rect.width;
 
     const mouseY =
-        (event.clientY - rect.top) *
-        canvas.height / rect.height;
+        (event.clientY - rect.top) * canvas.height / rect.height;
 
     const x = Math.round((mouseX - START_X) / STEP);
     const y = Math.round((mouseY - START_Y) / STEP);
 
-    if (
-        x < 0 || x >= COLS ||
-        y < -1 || y > ROWS
-    ) {
-        return;
-    }
+    if (!isInsideFieldOrGoal(x, y)) return;
 
     moveBall(x, y);
 });
