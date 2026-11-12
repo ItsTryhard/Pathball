@@ -1,21 +1,24 @@
 
-function utworzPokoj() {
-    const kod = Math.floor(
-        100000 + Math.random() * 900000
-    );
+const mainMenu = document.getElementById("mainMenu");
+const gameScreen = document.getElementById("gameScreen");
+const gameTitle = document.getElementById("gameTitle");
 
-    document.getElementById("komunikat")
-        .textContent = "Twój kod pokoju: " + kod;
+function playFriend() {
+    openGame("Play vs friend");
 }
 
-function dolaczDoPokoju() {
-    const kod = document.getElementById("kodPokoju").value;
+function playBot() {
+    openGame("Play vs bot");
+}
 
-    if (kod.length === 6) {
-        document.getElementById("komunikat")
-            .textContent = "Wpisano kod: " + kod;
-    } else {
-        document.getElementById("komunikat")
-            .textContent = "Wpisz prawidłowy kod!";
-    }
+function openGame(mode) {
+    mainMenu.classList.add("hidden");
+    gameScreen.classList.remove("hidden");
+
+    gameTitle.textContent = mode;
+}
+
+function backToMenu() {
+    gameScreen.classList.add("hidden");
+    mainMenu.classList.remove("hidden");
 }
