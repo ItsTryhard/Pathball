@@ -29,12 +29,10 @@ h1 {
     font-size: 55px;
     letter-spacing: 5px;
     color: #60a5fa;
-    margin-bottom: 10px;
 }
 
 .subtitle {
     color: #9ca3af;
-    font-size: 18px;
     margin-bottom: 40px;
 }
 
@@ -47,46 +45,118 @@ h1 {
 }
 
 button {
-    padding: 18px;
+    padding: 16px 22px;
     border: none;
     border-radius: 12px;
     background: #2563eb;
     color: white;
-    font-size: 18px;
+    font-size: 17px;
     font-weight: bold;
     cursor: pointer;
-    transition: 0.2s;
 }
 
 button:hover {
     background: #1d4ed8;
-    transform: scale(1.03);
 }
 
-.emptyBoard {
-    width: min(85vw, 450px);
-    aspect-ratio: 1 / 1;
-    background: #1f2937;
-    border: 2px solid #374151;
-    border-radius: 15px;
+.gameLogo {
+    font-size: 38px;
+    margin: 5px;
+}
+
+.score {
+    display: flex;
+    gap: 30px;
+    justify-content: center;
+    margin: 15px;
+}
+
+.player {
     display: flex;
     align-items: center;
-    justify-content: center;
+    gap: 8px;
+    font-size: 15px;
+}
+
+.player strong {
+    font-size: 22px;
+    margin-left: 5px;
+}
+
+.blueDot, .redDot {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+}
+
+.blueDot {
+    background: #3b82f6;
+}
+
+.redDot {
+    background: #ef4444;
+}
+
+#turnInfo {
+    margin: 12px;
+    padding: 12px 25px;
+    background: #263449;
+    border-radius: 10px;
+    font-weight: bold;
+}
+
+.fieldContainer {
+    width: min(94vw, 520px);
+    margin: 10px auto;
+    background: #dce9d5;
+    border: 5px solid #647c59;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    touch-action: manipulation;
+}
+
+.instructions {
     color: #9ca3af;
-    margin: 25px 0;
+    font-size: 13px;
+    margin: 12px;
+}
+
+.newGame {
+    background: #16a34a;
+    width: 210px;
+    margin: 5px;
+}
+
+.newGame:hover {
+    background: #15803d;
 }
 
 .backButton {
     background: #374151;
-    width: 200px;
-}
-
-.backButton:hover {
-    background: #4b5563;
+    width: 210px;
+    margin: 5px;
 }
 
 @media (max-width: 500px) {
     h1 {
-        font-size: 40px;
+        font-size: 38px;
+    }
+
+    .gameLogo {
+        font-size: 30px;
+    }
+
+    .score {
+        gap: 15px;
+    }
+
+    .player {
+        font-size: 13px;
     }
 }
