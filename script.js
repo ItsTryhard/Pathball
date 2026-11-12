@@ -11,7 +11,7 @@ const ROWS = 11;
 const STEP = 90;
 const START_X = 90;
 const START_Y = 180;
-const BALL_MOVE_DURATION = 240;
+const BALL_MOVE_DURATION = 750;
 
 const GOAL_LEFT = 3;
 const GOAL_RIGHT = 5;
@@ -280,18 +280,32 @@ function draw() {
     let ballX = ball.x;
     let ballY = ball.y;
     let ballScale = 1;
+    let liftHeight = 0;
 
     if (ballAnimation) {
         const progress = ballAnimation.progress;
-        ballX = ballAnimation.fromX + (ballAnimation.toX - ballAnimation.fromX) * progress;
-        ballY = ballAnimation.fromY + (ballAnimation.toY - ballAnimation.fromY) * progress;
-        ballScale = 1 + 0.4 * Math.sin(Math.PI * progress);
+        const easedProgress = progress * progress * (3 - 2 * progress);
+        const lift = Math.sin(Math.PI * easedProgress);
+
+        ballX = ballAnimation.fromX +
+            (ballAnimation.toX - ballAnimation.fromX) * easedProgress;
+        ballY = ballAnimation.fromY +
+            (ballAnimation.toY - ballAnimation.fromY) * easedProgress;
+        ballScale = 1 + 0.7 * lift;
+        liftHeight = 32 * lift;
     }
 
     const p = getPosition(ballX, ballY);
 
+    if (liftHeight > 0) {
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y + 15, 20, 7, 0, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0, 0, 0, ${0.22 * (1 - liftHeight / 32)})`;
+        ctx.fill();
+    }
+
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 21 * ballScale, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y - liftHeight, 21 * ballScale, 0, Math.PI * 2);
 
     ctx.fillStyle = COLORS[ballAnimation ? ballAnimation.player : currentPlayer];
     ctx.fill();
@@ -536,7 +550,7 @@ function finishPoint(winner, message) {
 
         updateTurn();
         draw();
-    }, 300);
+    }, BALL_MOVE_DURATION + 180);
 }
 
 function moveBall(x, y) {
