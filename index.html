@@ -1,43 +1,35 @@
 
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Moje Warcaby</title>
+    <title>Checkers Online</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <header>
-        <h1>♟ MOJE WARCABY</h1>
-        <p>Graj ze znajomymi przez internet!</p>
-    </header>
+    <div id="mainMenu" class="screen">
+        <h1>CHECKERS</h1>
+        <p class="subtitle">Choose your game mode</p>
 
-    <main>
-        <section class="menu">
-            <h2>Menu główne</h2>
+        <div class="buttons">
+            <button onclick="playFriend()">Play vs friend</button>
+            <button onclick="playBot()">Play vs bot</button>
+        </div>
+    </div>
 
-            <button onclick="utworzPokoj()">
-                Utwórz pokój
-            </button>
+    <div id="gameScreen" class="screen hidden">
+        <h1 id="gameTitle">Game</h1>
 
-            <div class="join">
-                <input id="kodPokoju"
-                       placeholder="Wpisz kod pokoju">
+        <div class="emptyBoard">
+            <p>The game will appear here.</p>
+        </div>
 
-                <button onclick="dolaczDoPokoju()">
-                    Dołącz do pokoju
-                </button>
-            </div>
-
-            <p id="komunikat"></p>
-        </section>
-    </main>
-
-    <footer>
-        <p>Moje Warcaby © 2026</p>
-    </footer>
+        <button class="backButton" onclick="backToMenu()">
+            Back to menu
+        </button>
+    </div>
 
     <script src="script.js"></script>
 </body>
