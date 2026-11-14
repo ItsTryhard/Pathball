@@ -66,10 +66,7 @@ applyGameOrientation();
 // BACKGROUND
 
 function updateBackground() {
-    document.body.style.transition =
-        `background-color ${BALL_MOVE_DURATION}ms ease`;
-
-    document.body.style.backgroundColor = COLORS[currentPlayer];
+    gameScreen.style.setProperty("--turn-color", COLORS[currentPlayer]);
 }
 
 // MENU
@@ -697,6 +694,13 @@ function updateScore() {
 }
 
 function updateTurn() {
-    document.getElementById("turnInfo").textContent =
-        "Player " + currentPlayer + "'s turn";
+    const turnInfo = document.getElementById("turnInfo");
+    turnInfo.textContent = "Player " + currentPlayer + "'s turn";
+    turnInfo.classList.remove("turn-change");
+    void turnInfo.offsetWidth;
+    turnInfo.classList.add("turn-change");
+
+    document.querySelectorAll(".player").forEach((player, index) => {
+        player.classList.toggle("active", index + 1 === currentPlayer);
+    });
 }
