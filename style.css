@@ -29,8 +29,8 @@ body {
     text-align: center;
 }
 
-.hidden {
-    display: none;
+.screen.hidden {
+    display: none !important;
 }
 
 h1 {
@@ -484,10 +484,6 @@ button:focus-visible {
         opacity: 1;
         transform: translateY(0) scale(1);
     }
-}
-
-#gameScreen.hidden {
-    display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

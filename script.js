@@ -66,6 +66,8 @@ applyGameOrientation();
 // BACKGROUND
 
 function updateBackground() {
+    document.body.style.removeProperty("background-color");
+    document.body.style.removeProperty("transition");
     gameScreen.style.setProperty("--turn-color", COLORS[currentPlayer]);
 }
 
@@ -84,6 +86,8 @@ function playBot() {
 function backToMenu() {
     gameScreen.classList.add("hidden");
     mainMenu.classList.remove("hidden");
+    document.body.style.removeProperty("background-color");
+    document.body.style.removeProperty("transition");
 }
 
 // NEW GAME
