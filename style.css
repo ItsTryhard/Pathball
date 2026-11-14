@@ -40,6 +40,20 @@ h1 {
     color: #f8fafc;
 }
 
+.pathballLogo {
+    display: block;
+    width: 100%;
+    aspect-ratio: 2 / 1;
+    object-fit: cover;
+    object-position: center 50%;
+}
+
+.menuLogo {
+    max-width: 430px;
+    margin: 0 auto;
+    animation: logoEnter 600ms ease both;
+}
+
 #mainMenu .menuCard {
     width: min(100%, 520px);
     padding: clamp(32px, 7vw, 64px);
@@ -135,11 +149,7 @@ button:focus-visible {
 
 .gameLogo {
     margin: 5px;
-    font-size: 38px;
-    letter-spacing: 0.14em;
-    background: linear-gradient(110deg, #f8fafc 15%, #93c5fd 55%, #dbeafe 90%);
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+    width: min(190px, 42vw);
     animation: logoEnter 600ms ease both;
 }
 
@@ -371,10 +381,6 @@ button:focus-visible {
         font-size: 38px;
     }
 
-    .gameLogo {
-        font-size: 30px;
-    }
-
     .score {
         gap: 12px;
     }
@@ -387,10 +393,6 @@ button:focus-visible {
         grid-template-columns: minmax(150px, 0.8fr) minmax(0, 1.6fr);
         padding-right: 64px;
         padding-left: 8px;
-    }
-
-    #gameScreen.landscape .gameLogo {
-        font-size: 28px;
     }
 
     #gameScreen.landscape .score {
