@@ -9,6 +9,9 @@ const COLS = 9;
 const ROWS = 11;
 
 const STEP = 90;
+const START_X = 30;
+const START_Y = 120;
+const BALL_MOVE_DURATION = 750;
 const START_X = 90;
 const START_Y = 180;
 const BALL_MOVE_DURATION = 300;
@@ -16,10 +19,13 @@ const BALL_MOVE_DURATION = 300;
 const GOAL_LEFT = 3;
 const GOAL_RIGHT = 5;
 const GOAL_DEPTH = 1;
+const PORTRAIT_CANVAS_WIDTH = 780;
+const PORTRAIT_CANVAS_HEIGHT = 1140;
 
 const TOP_GOAL_Y = -GOAL_DEPTH;
 const BOTTOM_GOAL_Y = ROWS - 1 + GOAL_DEPTH;
 
+let isLandscape = window.matchMedia("(orientation: landscape)").matches;
 let ball = { x: 4, y: 5 };
 let currentPlayer = 1;
 
@@ -35,6 +41,30 @@ const COLORS = {
     1: "#2563eb",
     2: "#ef4444"
 };
+
+function applyGameOrientation() {
+    gameScreen.classList.toggle("landscape", isLandscape);
+    canvas.width = isLandscape ? PORTRAIT_CANVAS_HEIGHT : PORTRAIT_CANVAS_WIDTH;
+    canvas.height = isLandscape ? PORTRAIT_CANVAS_WIDTH : PORTRAIT_CANVAS_HEIGHT;
+
+    const orientationButton = document.getElementById("orientationToggle");
+    orientationButton.setAttribute("aria-pressed", String(isLandscape));
+    orientationButton.setAttribute(
+        "aria-label",
+        isLandscape ? "Switch to portrait layout" : "Switch to landscape layout"
+    );
+    orientationButton.title = isLandscape
+        ? "Switch to portrait layout"
+        : "Switch to landscape layout";
+}
+
+function toggleOrientation() {
+    isLandscape = !isLandscape;
+    applyGameOrientation();
+    draw();
+}
+
+applyGameOrientation();
 
 // BACKGROUND
 
@@ -141,6 +171,12 @@ function draw() {
 
     ctx.fillStyle = "#dce9d5";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    if (isLandscape) {
+        ctx.translate(canvas.width, 0);
+        ctx.rotate(Math.PI / 2);
+    }
 
     // Horizontal field lines
     ctx.strokeStyle = "#78916f";
@@ -327,6 +363,8 @@ function draw() {
     ctx.strokeStyle = "#333333";
     ctx.lineWidth = 5;
     ctx.stroke();
+
+    ctx.restore();
 }
 
 // CHECK USED LINES
@@ -644,8 +682,10 @@ canvas.addEventListener("click", function(event) {
         (event.clientY - rect.top) *
         canvas.height / rect.height;
 
-    const x = Math.round((mouseX - START_X) / STEP);
-    const y = Math.round((mouseY - START_Y) / STEP);
+    const logicalX = isLandscape ? mouseY : mouseX;
+    const logicalY = isLandscape ? canvas.width - mouseX : mouseY;
+    const x = Math.round((logicalX - START_X) / STEP);
+    const y = Math.round((logicalY - START_Y) / STEP);
 
     if (!isInsideFieldOrGoal(x, y)) return;
 
