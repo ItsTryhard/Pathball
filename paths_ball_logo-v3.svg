@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 520" width="920" height="520">
+  <defs>
+    <!-- W 100% bezszwowy kafelek 6x3 kolumn/wierszy (eliminuje przesunięcia na krawędziach kafelków) -->
+    <pattern id="soccer-pattern" x="0" y="0" width="126.0000" height="72.7461" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="126.0000" height="72.7461" fill="#FFFFFF" />
+      <polygon points="-7.0000,-12.1244 -14.0000,0.0000 -28.0000,0.0000 -35.0000,-12.1244 -28.0000,-24.2487 -14.0000,-24.2487" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="-7.0000,12.1244 -14.0000,24.2487 -28.0000,24.2487 -35.0000,12.1244 -28.0000,0.0000 -14.0000,0.0000" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="-7.0000,36.3731 -14.0000,48.4974 -28.0000,48.4974 -35.0000,36.3731 -28.0000,24.2487 -14.0000,24.2487" fill="#111827" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="-7.0000,60.6218 -14.0000,72.7461 -28.0000,72.7461 -35.0000,60.6218 -28.0000,48.4974 -14.0000,48.4974" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="-7.0000,84.8705 -14.0000,96.9948 -28.0000,96.9948 -35.0000,84.8705 -28.0000,72.7461 -14.0000,72.7461" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="-7.0000,109.1192 -14.0000,121.2436 -28.0000,121.2436 -35.0000,109.1192 -28.0000,96.9948 -14.0000,96.9948" fill="#111827" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="14.0000,-24.2487 7.0000,-12.1244 -7.0000,-12.1244 -14.0000,-24.2487 -7.0000,-36.3731 7.0000,-36.3731" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="14.0000,0.0000 7.0000,12.1244 -7.0000,12.1244 -14.0000,0.0000 -7.0000,-12.1244 7.0000,-12.1244" fill="#111827" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="14.0000,24.2487 7.0000,36.3731 -7.0000,36.3731 -14.0000,24.2487 -7.0000,12.1244 7.0000,12.1244" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="14.0000,48.4974 7.0000,60.6218 -7.0000,60.6218 -14.0000,48.4974 -7.0000,36.3731 7.0000,36.3731" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="14.0000,72.7461 7.0000,84.8705 -7.0000,84.8705 -14.0000,72.7461 -7.0000,60.6218 7.0000,60.6218" fill="#111827" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="14.0000,96.9948 7.0000,109.1192 -7.0000,109.1192 -14.0000,96.9948 -7.0000,84.8705 7.0000,84.8705" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="35.0000,-12.1244 28.0000,0.0000 14.0000,0.0000 7.0000,-12.1244 14.0000,-24.2487 28.0000,-24.2487" fill="#111827" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="35.0000,12.1244 28.0000,24.2487 14.0000,24.2487 7.0000,12.1244 14.0000,0.0000 28.0000,0.0000" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="35.0000,36.3731 28.0000,48.4974 14.0000,48.4974 7.0000,36.3731 14.0000,24.2487 28.0000,24.2487" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="35.0000,60.6218 28.0000,72.7461 14.0000,72.7461 7.0000,60.6218 14.0000,48.4974 28.0000,48.4974" fill="#111827" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="35.0000,84.8705 28.0000,96.9948 14.0000,96.9948 7.0000,84.8705 14.0000,72.7461 28.0000,72.7461" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="35.0000,109.1192 28.0000,121.2436 14.0000,121.2436 7.0000,109.1192 14.0000,96.9948 28.0000,96.9948" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="56.0000,-24.2487 49.0000,-12.1244 35.0000,-12.1244 28.0000,-24.2487 35.0000,-36.3731 49.0000,-36.3731" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="56.0000,0.0000 49.0000,12.1244 35.0000,12.1244 28.0000,0.0000 35.0000,-12.1244 49.0000,-12.1244" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="56.0000,24.2487 49.0000,36.3731 35.0000,36.3731 28.0000,24.2487 35.0000,12.1244 49.0000,12.1244" fill="#111827" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="56.0000,48.4974 49.0000,60.6218 35.0000,60.6218 28.0000,48.4974 35.0000,36.3731 49.0000,36.3731" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="56.0000,72.7461 49.0000,84.8705 35.0000,84.8705 28.0000,72.7461 35.0000,60.6218 49.0000,60.6218" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="56.0000,96.9948 49.0000,109.1192 35.0000,109.1192 28.0000,96.9948 35.0000,84.8705 49.0000,84.8705" fill="#111827" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="77.0000,-12.1244 70.0000,0.0000 56.0000,0.0000 49.0000,-12.1244 56.0000,-24.2487 70.0000,-24.2487" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="77.0000,12.1244 70.0000,24.2487 56.0000,24.2487 49.0000,12.1244 56.0000,0.0000 70.0000,0.0000" fill="#111827" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="77.0000,36.3731 70.0000,48.4974 56.0000,48.4974 49.0000,36.3731 56.0000,24.2487 70.0000,24.2487" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="77.0000,60.6218 70.0000,72.7461 56.0000,72.7461 49.0000,60.6218 56.0000,48.4974 70.0000,48.4974" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="77.0000,84.8705 70.0000,96.9948 56.0000,96.9948 49.0000,84.8705 56.0000,72.7461 70.0000,72.7461" fill="#111827" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="77.0000,109.1192 70.0000,121.2436 56.0000,121.2436 49.0000,109.1192 56.0000,96.9948 70.0000,96.9948" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="98.0000,-24.2487 91.0000,-12.1244 77.0000,-12.1244 70.0000,-24.2487 77.0000,-36.3731 91.0000,-36.3731" fill="#111827" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="98.0000,0.0000 91.0000,12.1244 77.0000,12.1244 70.0000,0.0000 77.0000,-12.1244 91.0000,-12.1244" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="98.0000,24.2487 91.0000,36.3731 77.0000,36.3731 70.0000,24.2487 77.0000,12.1244 91.0000,12.1244" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="98.0000,48.4974 91.0000,60.6218 77.0000,60.6218 70.0000,48.4974 77.0000,36.3731 91.0000,36.3731" fill="#111827" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="98.0000,72.7461 91.0000,84.8705 77.0000,84.8705 70.0000,72.7461 77.0000,60.6218 91.0000,60.6218" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="98.0000,96.9948 91.0000,109.1192 77.0000,109.1192 70.0000,96.9948 77.0000,84.8705 91.0000,84.8705" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="119.0000,-12.1244 112.0000,0.0000 98.0000,0.0000 91.0000,-12.1244 98.0000,-24.2487 112.0000,-24.2487" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="119.0000,12.1244 112.0000,24.2487 98.0000,24.2487 91.0000,12.1244 98.0000,0.0000 112.0000,0.0000" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="119.0000,36.3731 112.0000,48.4974 98.0000,48.4974 91.0000,36.3731 98.0000,24.2487 112.0000,24.2487" fill="#111827" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="119.0000,60.6218 112.0000,72.7461 98.0000,72.7461 91.0000,60.6218 98.0000,48.4974 112.0000,48.4974" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="119.0000,84.8705 112.0000,96.9948 98.0000,96.9948 91.0000,84.8705 98.0000,72.7461 112.0000,72.7461" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="119.0000,109.1192 112.0000,121.2436 98.0000,121.2436 91.0000,109.1192 98.0000,96.9948 112.0000,96.9948" fill="#111827" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="140.0000,-24.2487 133.0000,-12.1244 119.0000,-12.1244 112.0000,-24.2487 119.0000,-36.3731 133.0000,-36.3731" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="140.0000,0.0000 133.0000,12.1244 119.0000,12.1244 112.0000,0.0000 119.0000,-12.1244 133.0000,-12.1244" fill="#111827" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="140.0000,24.2487 133.0000,36.3731 119.0000,36.3731 112.0000,24.2487 119.0000,12.1244 133.0000,12.1244" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="140.0000,48.4974 133.0000,60.6218 119.0000,60.6218 112.0000,48.4974 119.0000,36.3731 133.0000,36.3731" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="140.0000,72.7461 133.0000,84.8705 119.0000,84.8705 112.0000,72.7461 119.0000,60.6218 133.0000,60.6218" fill="#111827" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="140.0000,96.9948 133.0000,109.1192 119.0000,109.1192 112.0000,96.9948 119.0000,84.8705 133.0000,84.8705" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="161.0000,-12.1244 154.0000,0.0000 140.0000,0.0000 133.0000,-12.1244 140.0000,-24.2487 154.0000,-24.2487" fill="#111827" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="161.0000,12.1244 154.0000,24.2487 140.0000,24.2487 133.0000,12.1244 140.0000,0.0000 154.0000,0.0000" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="161.0000,36.3731 154.0000,48.4974 140.0000,48.4974 133.0000,36.3731 140.0000,24.2487 154.0000,24.2487" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="161.0000,60.6218 154.0000,72.7461 140.0000,72.7461 133.0000,60.6218 140.0000,48.4974 154.0000,48.4974" fill="#111827" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="161.0000,84.8705 154.0000,96.9948 140.0000,96.9948 133.0000,84.8705 140.0000,72.7461 154.0000,72.7461" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+      <polygon points="161.0000,109.1192 154.0000,121.2436 140.0000,121.2436 133.0000,109.1192 140.0000,96.9948 154.0000,96.9948" fill="#FFFFFF" stroke="#111827" stroke-width="1.35" stroke-linejoin="round" />
+    </pattern>
+
+    <!-- Kształt napisu PATHS używany jako cień i warstwa główna -->
+    <g id="paths-letters" stroke-linecap="round" stroke-linejoin="round">
+      <!-- P -->
+      <path d="M 110,330 L 82,165 C 145,142 205,152 212,195 C 218,235 170,262 102,268" fill="none" stroke-width="58" />
+      <!-- A -->
+      <path d="M 272,305 L 315,142 L 395,292 M 288,242 L 368,232" fill="none" stroke-width="56" />
+      <!-- T -->
+      <path d="M 472,148 L 605,162 M 538,158 L 518,302" fill="none" stroke-width="54" />
+      <!-- H -->
+      <path d="M 678,162 L 652,308 M 778,175 L 748,325 M 664,238 L 762,248" fill="none" stroke-width="54" />
+      <!-- S (zawijas po prawej) -->
+      <path d="M 852,272 C 818,274 808,295 826,306 C 844,316 832,338 796,338" fill="none" stroke-width="26" />
+    </g>
+  </defs>
+
+  <!-- Warstwa czerwona / koralowa (przesunięty cień) -->
+  <g id="warstwa-czerwona" transform="translate(-32, 34)" stroke="#FF5757">
+    <use href="#paths-letters" />
+  </g>
+
+  <!-- Warstwa niebieska (główny napis PATHS) -->
+  <g id="warstwa-niebieska" transform="translate(8, -8)" stroke="#38B6FF">
+    <use href="#paths-letters" />
+  </g>
+
+  <!-- Napis BALL z jednolitym, bezszwowym wzorem sześciokątów -->
+  <g id="napis-ball" transform="rotate(-9, 450, 390)" fill="url(#soccer-pattern)" stroke="#111827" stroke-width="2">
+    <!-- B -->
+    <path d="M 235,342 L 285,342 C 308,342 320,352 320,368 C 320,380 312,388 300,391 C 316,394 326,404 326,419 C 326,437 312,448 286,448 L 235,448 Z M 263,363 L 263,383 L 282,383 C 291,383 295,379 295,373 C 295,367 291,363 282,363 Z M 263,402 L 263,426 L 285,426 C 295,426 300,422 300,414 C 300,406 295,402 285,402 Z" fill-rule="evenodd" />
+    <!-- A -->
+    <path d="M 378,342 L 408,342 L 446,448 L 416,448 L 409,426 L 375,426 L 368,448 L 340,448 Z M 392,371 L 381,406 L 403,406 Z" fill-rule="evenodd" />
+    <!-- L -->
+    <path d="M 464,342 L 492,342 L 492,425 L 542,425 L 542,448 L 464,448 Z" />
+    <!-- L -->
+    <path d="M 558,342 L 586,342 L 586,425 L 636,425 L 636,448 L 558,448 Z" />
+  </g>
+</svg>
