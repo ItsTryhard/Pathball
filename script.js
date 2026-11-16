@@ -1,4 +1,3 @@
-
 const mainMenu = document.getElementById("mainMenu");
 const gameScreen = document.getElementById("gameScreen");
 
@@ -84,6 +83,8 @@ function playBot() {
 }
 
 function backToMenu() {
+    if (window.online && window.online.active) window.online.leave();
+
     gameScreen.classList.add("hidden");
     mainMenu.classList.remove("hidden");
     document.body.style.removeProperty("background-color");
@@ -108,6 +109,12 @@ function newGame() {
     updateTurn();
     updateBackground();
     draw();
+}
+
+// "New game" button: in online mode the restart is sent to both players
+function restartClick() {
+    if (window.online && window.online.active) window.online.restart();
+    else newGame();
 }
 
 // POSITION
@@ -687,7 +694,11 @@ canvas.addEventListener("click", function(event) {
 
     if (!isInsideFieldOrGoal(x, y)) return;
 
-    moveBall(x, y);
+    if (window.online && window.online.active) {
+        window.online.click(x, y);
+    } else {
+        moveBall(x, y);
+    }
 });
 
 // UPDATE UI
@@ -707,4 +718,4 @@ function updateTurn() {
     document.querySelectorAll(".player").forEach((player, index) => {
         player.classList.toggle("active", index + 1 === currentPlayer);
     });
-}
+        }
