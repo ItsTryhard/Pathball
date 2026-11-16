@@ -55,8 +55,6 @@
 
     let botP = 2;
     let ev = evalT[2];
-    let rootDepth = 0;
-    let rootDir = -1;
 
     // Minimax z alfa-beta. Wynik zawsze z punktu widzenia bota.
     // Uwaga: po odbiciu ten sam gracz rusza się dalej, więc tury nie muszą się przeplatać.
@@ -119,10 +117,7 @@
             }
 
             if (maximizing) {
-                if (score > best) {
-                    best = score;
-                    if (depth === rootDepth) rootDir = d;
-                }
+                if (score > best) best = score;
                 if (best > alpha) alpha = best;
             } else {
                 if (score < best) best = score;
@@ -151,19 +146,58 @@
 
         botP = bot.player;
         ev = evalT[botP];
-        rootDepth = depth;
-        rootDir = -1;
 
-        search(idx(ball.x, ball.y), currentPlayer, depth, -Infinity, Infinity);
+        const pos = idx(ball.x, ball.y);
+        const player = currentPlayer;
+        const tol = Math.max(bot.tolerance, 1e-6);
+        const results = [];
+        let best = -Infinity;
 
-        if (rootDir < 0) return null;
-        return { x: ball.x + DIRS[rootDir][0], y: ball.y + DIRS[rootDir][1] };
+        // Ruchy z korzenia sprawdzamy osobno, z oknem poszerzonym o tolerancję,
+        // żeby poznać dokładne oceny wszystkich ruchów bliskich najlepszemu.
+        for (let d = 0; d < 8; d++) {
+            if (!allowed[pos * 8 + d] || used[pos * 8 + d]) continue;
+            const dest = pos + OFF[d];
+            const g = goalPt[dest];
+            let score;
+
+            if (g) {
+                score = g === botP ? WIN + depth : -(WIN + depth);
+            } else {
+                const bounce = touched[dest] > 0 || wallPt[dest] === 1;
+
+                used[pos * 8 + d] = 1;
+                used[dest * 8 + 7 - d] = 1;
+                touched[pos]++;
+                touched[dest]++;
+
+                score = depth === 1
+                    ? ev[dest]
+                    : search(dest, bounce ? player : 3 - player, depth - 1, best - tol, Infinity);
+
+                used[pos * 8 + d] = 0;
+                used[dest * 8 + 7 - d] = 0;
+                touched[pos]--;
+                touched[dest]--;
+            }
+
+            results.push({ d, score });
+            if (score > best) best = score;
+        }
+
+        if (results.length === 0) return null;
+
+        // Losowy wybór spośród ruchów o ocenie prawie równej najlepszej
+        const good = results.filter(r => r.score > best - tol);
+        const pick = good[Math.floor(Math.random() * good.length)];
+        return { x: ball.x + DIRS[pick.d][0], y: ball.y + DIRS[pick.d][1] };
     }
 
     const bot = {
         active: false,
         player: 2,      // bot gra jako gracz 2 (czerwony)
         depth: 7,       // jeśli za wolno na telefonie, zmień na 5 lub 6
+        tolerance: 0.3, // losowość: 0 = prawie zawsze ten sam ruch, więcej = bardziej losowy i słabszy
         timer: null,
 
         start() {
