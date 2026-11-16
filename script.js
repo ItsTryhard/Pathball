@@ -73,16 +73,21 @@ function updateBackground() {
 // MENU
 
 function playFriend() {
+    if (window.bot) bot.stop();
     mainMenu.classList.add("hidden");
     gameScreen.classList.remove("hidden");
     newGame();
 }
 
 function playBot() {
-    alert("Bot mode coming soon!");
+    mainMenu.classList.add("hidden");
+    gameScreen.classList.remove("hidden");
+    bot.start();
+    newGame();
 }
 
 function backToMenu() {
+    if (window.bot) bot.stop();
     if (window.online && window.online.active) window.online.leave();
 
     gameScreen.classList.add("hidden");
@@ -113,6 +118,7 @@ function newGame() {
 
 // "New game" button: in online mode the restart is sent to both players
 function restartClick() {
+    if (window.bot && bot.active && currentPlayer === bot.player) return;
     if (window.online && window.online.active) window.online.restart();
     else newGame();
 }
@@ -718,4 +724,5 @@ function updateTurn() {
     document.querySelectorAll(".player").forEach((player, index) => {
         player.classList.toggle("active", index + 1 === currentPlayer);
     });
-        }
+    if (window.bot) bot.onTurn();
+}
