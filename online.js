@@ -52,8 +52,15 @@ function startPump() {
     pump = setInterval(() => {
         if (ballAnimation || gameOver || queue.length === 0) return;
         const m = queue.shift();
-        if (m.t === "reset") newGame();
-        else moveBall(m.x, m.y);
+        if (m.t === "reset") {
+            newGame();
+        } else if (m.t === "surrender") {
+            const winner = m.p === 1 ? 2 : 1;
+            alert("Player " + m.p + " surrendered. Player " + winner + " wins!");
+            newGame();
+        } else {
+            moveBall(m.x, m.y);
+        }
     }, 50);
 }
 
@@ -108,8 +115,8 @@ online.click = (x, y) => {
     touch(online.room);
 };
 
-online.restart = () => {
-    push(ref(db, `rooms/${online.room}/moves`), { t: "reset" });
+online.surrender = () => {
+    push(ref(db, `rooms/${online.room}/moves`), { t: "surrender", p: online.me });
     touch(online.room);
 };
 
