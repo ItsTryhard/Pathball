@@ -196,7 +196,7 @@
     const bot = {
         active: false,
         player: 2,      // bot gra jako gracz 2 (czerwony)
-        depth: 7,       // jeśli za wolno na telefonie, zmień na 5 lub 6
+        depth: 10,       // jeśli za wolno na telefonie, zmień na 5 lub 6
         tolerance: 0.3, // losowość: 0 = prawie zawsze ten sam ruch, więcej = bardziej losowy i słabszy
         timer: null,
 
