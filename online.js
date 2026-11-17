@@ -1,9 +1,9 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
-    getDatabase, ref, push, set, onChildAdded, onDisconnect, runTransaction
+    getDatabase, ref, push, set, get, remove, query, orderByChild, endAt, limitToFirst,
+    onChildAdded, onDisconnect, runTransaction, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
-// 1) WKLEJ TUTAJ SWOJE firebaseConfig z konsoli Firebase
 const app = initializeApp({
     apiKey: "AIzaSyCzEV2gAMv-ncevuJ3wps-ksGPl6K0MBAk",
     authDomain: "pathball-9d69e.firebaseapp.com",
@@ -13,12 +13,38 @@ const app = initializeApp({
 });
 const db = getDatabase(app);
 
+// Pokój bez graczy i bez aktywności dłużej niż tyle zostaje usunięty
+const STALE_MS = 15 * 60 * 1000;
+
 const online = { active: false, room: null, me: 0 };
 window.online = online;
 
 let queue = [];       // ruchy czekające na wykonanie
 let unsubMoves = null;
 let pump = null;
+
+// Zapisuje czas ostatniej aktywności w pokoju
+function touch(code) {
+    set(ref(db, `rooms/${code}/lastActive`), serverTimestamp());
+}
+
+// Usuwa stare pokoje, w których nikogo nie ma (maks. 20 naraz)
+async function cleanupStaleRooms() {
+    try {
+        const q = query(
+            ref(db, "rooms"),
+            orderByChild("lastActive"),
+            endAt(Date.now() - STALE_MS),
+            limitToFirst(20)
+        );
+        const snap = await get(q);
+        snap.forEach(child => {
+            if (!child.val().players) remove(child.ref);
+        });
+    } catch (e) {
+        console.warn("Cleanup failed:", e);
+    }
+}
 
 // Wykonuje ruchy po kolei, dopiero gdy poprzedni się skończył
 function startPump() {
@@ -39,12 +65,14 @@ async function claimSeat(code) {
         if (!cur[1]) { seat = 1; cur[1] = true; return cur; }
         if (!cur[2]) { seat = 2; cur[2] = true; return cur; }
         seat = 0;
-                return; // przerwij – pokój pełny
+        return; // przerwij – pokój pełny
     });
     return seat;
 }
 
 window.playOnline = async function () {
+    cleanupStaleRooms();   // sprzątanie w tle
+
     let code = (prompt("Kod pokoju (zostaw puste, żeby utworzyć nowy):") || "")
         .trim().toUpperCase();
     if (!code) code = Math.random().toString(36).slice(2, 6).toUpperCase();
@@ -58,6 +86,7 @@ window.playOnline = async function () {
     queue = [];
 
     onDisconnect(ref(db, `rooms/${code}/players/${seat}`)).remove();
+    touch(code);
 
     mainMenu.classList.add("hidden");
     gameScreen.classList.remove("hidden");
@@ -76,19 +105,36 @@ online.click = (x, y) => {
     if (ballAnimation || gameOver || queue.length) return;
     if (!isLegalMove(x, y)) return;
     push(ref(db, `rooms/${online.room}/moves`), { t: "move", x, y });
+    touch(online.room);
 };
 
 online.restart = () => {
     push(ref(db, `rooms/${online.room}/moves`), { t: "reset" });
+    touch(online.room);
 };
 
-online.leave = () => {
+online.leave = async () => {
     if (!online.active) return;
-    if (unsubMoves) unsubMoves();
-    clearInterval(pump);
-    const seatRef = ref(db, `rooms/${online.room}/players/${online.me}`);
-    onDisconnect(seatRef).cancel();
-    set(seatRef, null);
+
+    const room = online.room;
+    const seat = online.me;
+
     online.active = false;
     queue = [];
+    if (unsubMoves) unsubMoves();
+    clearInterval(pump);
+
+    onDisconnect(ref(db, `rooms/${room}/players/${seat}`)).cancel();
+
+    try {
+        // Zwolnij swoje miejsce; jeśli to był ostatni gracz, usuń cały pokój
+        const res = await runTransaction(ref(db, `rooms/${room}/players`), cur => {
+            cur = cur || {};
+            delete cur[seat];
+            return Object.keys(cur).length ? cur : null;
+        });
+        if (!res.snapshot.exists()) await remove(ref(db, `rooms/${room}`));
+    } catch (e) {
+        console.warn("Leave failed:", e);
+    }
 };
