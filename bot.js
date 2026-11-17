@@ -253,14 +253,14 @@
         onTurn() {
             if (!this.active || gameOver || currentPlayer !== this.player) return;
             clearTimeout(this.timer);
-            this.timer = setTimeout(() => this.play(), BALL_MOVE_DURATION + 150);
+            this.timer = setTimeout(() => this.play(), 0);
         },
 
         play() {
             if (!this.active || gameOver || currentPlayer !== this.player) return;
 
             if (ballAnimation) {
-                this.timer = setTimeout(() => this.play(), 60);
+                this.timer = setTimeout(() => this.play(), 20);
                 return;
             }
 
