@@ -118,7 +118,6 @@ function newGame() {
 
 // "New game" button: in online mode the restart is sent to both players
 function restartClick() {
-    if (window.bot && bot.active && currentPlayer === bot.player) return;
     if (window.online && window.online.active) window.online.restart();
     else newGame();
 }
@@ -173,6 +172,12 @@ function isInsideFieldOrGoal(x, y) {
     }
 
     return false;
+}
+
+function isHumanTurn() {
+    if (window.bot && bot.active) return currentPlayer !== bot.player;
+    if (window.online && online.active) return currentPlayer === online.me;
+    return true;
 }
 
 // DRAWING
@@ -323,7 +328,7 @@ function draw() {
     }
 
     // Highlight legal destinations for the current player
-    getLegalMoves().forEach(({ x, y }) => {
+    if (isHumanTurn()) getLegalMoves().forEach(({ x, y }) => {
         const p = getPosition(x, y);
 
         ctx.beginPath();
@@ -699,6 +704,7 @@ canvas.addEventListener("click", function(event) {
     const y = Math.round((logicalY - START_Y) / STEP);
 
     if (!isInsideFieldOrGoal(x, y)) return;
+    if (!isHumanTurn) return;
 
     if (window.online && window.online.active) {
         window.online.click(x, y);
