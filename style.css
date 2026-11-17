@@ -317,6 +317,14 @@ button:focus-visible {
     animation: turnChange 450ms ease both;
 }
 
+.newGame.surrender {
+    background: linear-gradient(135deg, #ef4444, #b91c1c);
+}
+
+.newGame.surrender:hover {
+    background: linear-gradient(135deg, #f87171, #dc2626);
+}
+
 #gameScreen.landscape {
     display: grid;
     grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.6fr);
