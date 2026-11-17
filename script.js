@@ -297,6 +297,30 @@ function draw() {
     );
     ctx.stroke();
 
+    // Field border (same style as the goal walls)
+    ctx.strokeStyle = "#527b4a";
+    ctx.lineWidth = 7;
+    ctx.lineCap = "square";
+
+    const tl = getPosition(0, 0);
+    const bl = getPosition(0, ROWS - 1);
+    const tr = getPosition(COLS - 1, 0);
+    const br = getPosition(COLS - 1, ROWS - 1);
+    const gl = getPosition(GOAL_LEFT, 0).x;
+    const gr = getPosition(GOAL_RIGHT, 0).x;
+
+    ctx.beginPath();
+    ctx.moveTo(gl, tl.y);
+    ctx.lineTo(tl.x, tl.y);
+    ctx.lineTo(bl.x, bl.y);
+    ctx.lineTo(gl, bl.y);
+
+    ctx.moveTo(gr, tr.y);
+    ctx.lineTo(tr.x, tr.y);
+    ctx.lineTo(br.x, br.y);
+    ctx.lineTo(gr, br.y);
+    ctx.stroke();
+
     // Used paths
     lines.forEach(line => {
         const a = getPosition(line.x1, line.y1);
