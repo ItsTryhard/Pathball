@@ -1,4 +1,4 @@
-// bot.js - bot Minimax + alfa-beta (domyślnie głębokość 7)
+// bot.js - bot Minimax + alfa-beta z iteracyjnym pogłębianiem i limitem czasu
 // Ładuj PO script.js (korzysta z jego funkcji i zmiennych).
 
 (function () {
@@ -6,6 +6,7 @@
     const DIRS = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
     const OFF = DIRS.map(([dx, dy]) => dy * COLS + dx);
     const WIN = 10000;
+    const MAX_DEPTH = 30;                      // zabezpieczenie, gdy pozycja jest prosta
     const idx = (x, y) => (y + 1) * COLS + x;
     const gx = (COLS - 1) / 2;
 
@@ -48,17 +49,24 @@
     const touched = new Uint8Array(N);         // ile użytych linii dotyka punktu
     const bufD = [];
     const bufS = [];
-    for (let i = 0; i <= 12; i++) {
+    for (let i = 0; i <= MAX_DEPTH; i++) {
         bufD.push(new Int8Array(8));
         bufS.push(new Float64Array(8));
     }
 
     let botP = 2;
     let ev = evalT[2];
+    let nodes = 0;
+    let deadline = 0;
+    let timedOut = false;
 
     // Minimax z alfa-beta. Wynik zawsze z punktu widzenia bota.
     // Uwaga: po odbiciu ten sam gracz rusza się dalej, więc tury nie muszą się przeplatać.
     function search(pos, player, depth, alpha, beta) {
+        // Co 1024 węzły sprawdzamy czas
+        if ((++nodes & 1023) === 0 && performance.now() > deadline) timedOut = true;
+        if (timedOut) return 0;
+
         const maximizing = player === botP;
         const base = pos * 8;
         const dirs = bufD[depth];
@@ -114,6 +122,8 @@
                 used[dest * 8 + 7 - d] = 0;
                 touched[pos]--;
                 touched[dest]--;
+
+                if (timedOut) return 0;
             }
 
             if (maximizing) {
@@ -130,7 +140,9 @@
         return best;
     }
 
-    function findBestMove(depth) {
+    // Iteracyjne pogłębianie: głębokość 1, 2, 3... aż skończy się czas.
+    // Używamy wyniku ostatniej w pełni ukończonej głębokości.
+    function findBestMove() {
         used.fill(0);
         touched.fill(0);
 
@@ -150,54 +162,82 @@
         const pos = idx(ball.x, ball.y);
         const player = currentPlayer;
         const tol = Math.max(bot.tolerance, 1e-6);
-        const results = [];
-        let best = -Infinity;
 
-        // Ruchy z korzenia sprawdzamy osobno, z oknem poszerzonym o tolerancję,
-        // żeby poznać dokładne oceny wszystkich ruchów bliskich najlepszemu.
+        // Legalne ruchy z korzenia; na start posortowane heurystyką
+        let order = [];
         for (let d = 0; d < 8; d++) {
-            if (!allowed[pos * 8 + d] || used[pos * 8 + d]) continue;
-            const dest = pos + OFF[d];
-            const g = goalPt[dest];
-            let score;
+            if (allowed[pos * 8 + d] && !used[pos * 8 + d]) order.push(d);
+        }
+        if (order.length === 0) return null;
+        order.sort((a, b) => ev[pos + OFF[b]] - ev[pos + OFF[a]]);
 
-            if (g) {
-                score = g === botP ? WIN + depth : -(WIN + depth);
-            } else {
-                const bounce = touched[dest] > 0 || wallPt[dest] === 1;
+        nodes = 0;
+        timedOut = false;
+        deadline = performance.now() + bot.timeLimit;
+        let chosen = order[0];
+        bot.lastDepth = 0;
 
-                used[pos * 8 + d] = 1;
-                used[dest * 8 + 7 - d] = 1;
-                touched[pos]++;
-                touched[dest]++;
+        for (let depth = 1; depth <= MAX_DEPTH; depth++) {
+            const results = [];
+            let best = -Infinity;
 
-                score = depth === 1
-                    ? ev[dest]
-                    : search(dest, bounce ? player : 3 - player, depth - 1, best - tol, Infinity);
+            // Ruchy z korzenia sprawdzamy osobno, z oknem poszerzonym o tolerancję,
+            // żeby poznać dokładne oceny wszystkich ruchów bliskich najlepszemu.
+            for (const d of order) {
+                const dest = pos + OFF[d];
+                const g = goalPt[dest];
+                let score;
 
-                used[pos * 8 + d] = 0;
-                used[dest * 8 + 7 - d] = 0;
-                touched[pos]--;
-                touched[dest]--;
+                if (g) {
+                    score = g === botP ? WIN + depth : -(WIN + depth);
+                } else {
+                    const bounce = touched[dest] > 0 || wallPt[dest] === 1;
+
+                    used[pos * 8 + d] = 1;
+                    used[dest * 8 + 7 - d] = 1;
+                    touched[pos]++;
+                    touched[dest]++;
+
+                    score = depth === 1
+                        ? ev[dest]
+                        : search(dest, bounce ? player : 3 - player, depth - 1, best - tol, Infinity);
+
+                    used[pos * 8 + d] = 0;
+                    used[dest * 8 + 7 - d] = 0;
+                    touched[pos]--;
+                    touched[dest]--;
+                }
+
+                if (timedOut) break;
+
+                results.push({ d, score });
+                if (score > best) best = score;
             }
 
-            results.push({ d, score });
-            if (score > best) best = score;
+            if (timedOut) break;   // ta głębokość nieukończona - zostaje poprzedni wynik
+
+            // Losowy wybór spośród ruchów o ocenie prawie równej najlepszej
+            const good = results.filter(r => r.score > best - tol);
+            chosen = good[Math.floor(Math.random() * good.length)].d;
+            bot.lastDepth = depth;
+
+            // Następna głębokość zaczyna od najlepszych ruchów (więcej odcięć)
+            results.sort((a, b) => b.score - a.score);
+            order = results.map(r => r.d);
+
+            // Znaleziono wymuszoną wygraną lub przegraną - głębiej nie ma sensu
+            if (Math.abs(best) >= WIN) break;
         }
 
-        if (results.length === 0) return null;
-
-        // Losowy wybór spośród ruchów o ocenie prawie równej najlepszej
-        const good = results.filter(r => r.score > best - tol);
-        const pick = good[Math.floor(Math.random() * good.length)];
-        return { x: ball.x + DIRS[pick.d][0], y: ball.y + DIRS[pick.d][1] };
+        return { x: ball.x + DIRS[chosen][0], y: ball.y + DIRS[chosen][1] };
     }
 
     const bot = {
         active: false,
-        player: 2,      // bot gra jako gracz 2 (czerwony)
-        depth: 10,       // jeśli za wolno na telefonie, zmień na 5 lub 6
-        tolerance: 0.3, // losowość: 0 = prawie zawsze ten sam ruch, więcej = bardziej losowy i słabszy
+        player: 2,                      // bot gra jako gracz 2 (czerwony)
+        timeLimit: BALL_MOVE_DURATION,  // limit czasu na ruch w ms (tyle co animacja)
+        tolerance: 0.3,                 // losowość: 0 = prawie zawsze ten sam ruch, więcej = bardziej losowy i słabszy
+        lastDepth: 0,                   // do podglądu: jak głęboko bot doszedł w ostatnim ruchu
         timer: null,
 
         start() {
@@ -224,7 +264,7 @@
                 return;
             }
 
-            const move = findBestMove(this.depth);
+            const move = findBestMove();
             if (move) moveBall(move.x, move.y);
         }
     };
