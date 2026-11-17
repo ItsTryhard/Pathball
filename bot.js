@@ -277,7 +277,7 @@
         active: false,
         player: 2,                      // bot gra jako gracz 2 (czerwony)
         timeLimit: BALL_MOVE_DURATION,  // limit czasu na ruch w ms (tyle co animacja)
-        tolerance: 0.3,                 // losowość: 0 = prawie zawsze ten sam ruch, więcej = bardziej losowy i słabszy
+        tolerance: 0.2,                 // losowość: 0 = prawie zawsze ten sam ruch, więcej = bardziej losowy i słabszy
         lastDepth: 0,                   // do podglądu: jak głęboko bot doszedł w ostatnim ruchu
         requestId: 0,
         readyMove: null,
