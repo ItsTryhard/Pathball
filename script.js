@@ -110,16 +110,42 @@ function newGame() {
     visitedPoints = new Map([[`${ball.x},${ball.y}`, currentPlayer]]);
     gameOver = false;
 
+    updateActionButton();
     updateScore();
     updateTurn();
     updateBackground();
     draw();
 }
 
-// "New game" button: in online mode the restart is sent to both players
+// Online and bot games: the button is a red "Surrender". Friend games: "New game".
+function isSurrenderMode() {
+    return Boolean(
+        (window.online && window.online.active) ||
+        (window.bot && window.bot.active)
+    );
+}
+
+function updateActionButton() {
+    const button = document.querySelector(".newGame");
+    const surrender = isSurrenderMode();
+
+    button.textContent = surrender ? "Surrender" : "New game";
+    button.classList.toggle("surrender", surrender);
+}
+
 function restartClick() {
-    if (window.online && window.online.active) window.online.restart();
-    else newGame();
+    if (window.online && window.online.active) {
+        if (confirm("Surrender? Your opponent will win.")) {
+            window.online.surrender();
+        }
+    } else if (window.bot && window.bot.active) {
+        if (confirm("Surrender? The bot will win.")) {
+            alert("You surrendered. The bot wins!");
+            newGame();
+        }
+    } else {
+        newGame();
+    }
 }
 
 // POSITION
@@ -351,7 +377,7 @@ function draw() {
         }
     }
 
-    // Highlight legal destinations for the current player
+    // Highlight legal destinations only on the human player's turn
     if (isHumanTurn()) getLegalMoves().forEach(({ x, y }) => {
         const p = getPosition(x, y);
 
@@ -728,7 +754,7 @@ canvas.addEventListener("click", function(event) {
     const y = Math.round((logicalY - START_Y) / STEP);
 
     if (!isInsideFieldOrGoal(x, y)) return;
-    if (!isHumanTurn) return;
+    if (!isHumanTurn()) return;
 
     if (window.online && window.online.active) {
         window.online.click(x, y);
@@ -754,5 +780,6 @@ function updateTurn() {
     document.querySelectorAll(".player").forEach((player, index) => {
         player.classList.toggle("active", index + 1 === currentPlayer);
     });
+
     if (window.bot) bot.onTurn();
 }
