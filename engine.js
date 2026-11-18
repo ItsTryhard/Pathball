@@ -678,4 +678,16 @@ self.onmessage = function (e) {
         stats = { games: 0, plies: 0, loss: 0 };
         training = true;
         trainLoop();
-    } else 
+    } else if (m.type === "stop") {
+        training = false;
+        if (net) self.postMessage({ type: "weights", weights: serializeNet() });
+    } else if (m.type === "eval") {
+        if (!net) net = newNet();
+        self.postMessage({
+            type: "eval",
+            games: stats ? stats.games : 0,
+            score: runEval(m.cfg.evalGames, m.cfg.depth),
+            evalGames: m.cfg.evalGames
+        });
+    }
+};
