@@ -484,24 +484,18 @@ function pickRandom(r, tol) {
 }
 
 // Iteracyjne pogłębianie: głębokość 1, 2, 3... aż skończy się czas.
-// Używamy wyniku ostatniej w pełni ukończonej głębokości.
-function findBestMove(s) {
-    loadState(s.lines);
-    botP = s.player;
-    ev = evalT[botP];
-    useNN = Boolean(net) && s.useNN !== false;
-
-    const pos = idx(s.ball.x, s.ball.y);
-    const player = s.currentPlayer;
-    const tol = Math.max(s.tolerance, 1e-6);
+// Używamy wyniku ostatniej w pełni ukończonej głębokości. Zwraca kierunek ruchu (-1 = brak ruchów).
+// Przed wywołaniem trzeba ustawić botP, ev i useNN.
+function iterate(pos, player, timeMs, tolerance) {
+    const tol = Math.max(tolerance, 1e-6);
 
     let order = legalDirs(pos);
-    if (order.length === 0) return null;
+    if (order.length === 0) return -1;
     order.sort((a, b) => ev[pos + OFF[b]] - ev[pos + OFF[a]]);
 
     nodes = 0;
     timedOut = false;
-    deadline = performance.now() + s.timeLimit;
+    deadline = performance.now() + timeMs;
     let chosen = order[0];
     lastDepth = 0;
 
@@ -518,7 +512,18 @@ function findBestMove(s) {
         if (Math.abs(r.best) >= WIN) break; // wymuszona wygrana lub przegrana
     }
 
-    return { x: s.ball.x + DIRS[chosen][0], y: s.ball.y + DIRS[chosen][1] };
+    return chosen;
+}
+
+function findBestMove(s) {
+    loadState(s.lines);
+    botP = s.player;
+    ev = evalT[botP];
+    useNN = Boolean(net) && s.useNN !== false;
+
+    const d = iterate(idx(s.ball.x, s.ball.y), s.currentPlayer, s.timeLimit, s.tolerance);
+    if (d < 0) return null;
+    return { x: s.ball.x + DIRS[d][0], y: s.ball.y + DIRS[d][1] };
 }
 
 // ===== Symulacja gier i trening (self-play) =====
@@ -552,7 +557,8 @@ function chooseMoveFixed(pos, player, depth, tol) {
     return pickRandom(searchRoot(pos, player, depth, order, tol), tol);
 }
 
-// opts: depth, eps (szansa losowego ruchu), tol, opening (liczba losowych otwierających ruchów),
+// opts: depth (stała głębokość) albo timeMs > 0 (iteracyjne pogłębianie z limitem czasu na ruch),
+//       eps (szansa losowego ruchu), tol, opening (liczba losowych otwierających ruchów),
 //       nn {1: bool, 2: bool} (kto używa sieci), record (zapisuj pozycje do nauki)
 function playGame(opts) {
     used.fill(0);
@@ -577,6 +583,10 @@ function playGame(opts) {
         if (plies < opts.opening || Math.random() < opts.eps) {
             const dirs = legalDirs(st.pos);
             d = dirs[Math.floor(Math.random() * dirs.length)];
+        } else if (opts.timeMs > 0) {
+            botP = p;
+            ev = evalT[p];
+            d = iterate(st.pos, p, opts.timeMs, opts.tol);
         } else {
             d = chooseMoveFixed(st.pos, p, opts.depth, opts.tol);
         }
@@ -588,34 +598,42 @@ function playGame(opts) {
     return { winner, plies, rec };
 }
 
-// Nauka z jednej gry: wynik punktu (+1/-1/0) dla każdej pozycji z obu perspektyw,
-// z lekkim tłumieniem dla pozycji odległych od końca.
-function learn(rec, winner, lr) {
-    const order = rec.map((_, i) => i);
-    for (let i = order.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [order[i], order[j]] = [order[j], order[i]];
-    }
+// Bufor powtórek: uczymy się na losowych pozycjach z ostatnich gier, a nie tylko z najnowszej.
+// Dzięki temu nauka jest spokojniejsza i mniej "skacze".
+const REPLAY_MAX = 30000;
+let replay = [];
 
-    let loss = 0;
-    for (const i of order) {
+// Cel nauki: wynik punktu (+1/-1/0) dla każdej pozycji z obu perspektyw,
+// z lekkim tłumieniem dla pozycji odległych od końca.
+function addToReplay(rec, winner) {
+    for (let i = 0; i < rec.length; i++) {
         const disc = Math.pow(0.98, rec.length - i);
         for (let me = 1; me <= 2; me++) {
             const z = winner === 0 ? 0 : (winner === me ? 1 : -1);
-            feat.set(me === 1 ? rec[i].f1 : rec[i].f2);
-            loss += trainStep(z * disc, lr);
+            replay.push({ f: me === 1 ? rec[i].f1 : rec[i].f2, t: z * disc });
         }
     }
-    return loss / (rec.length * 2);
+    if (replay.length > REPLAY_MAX + 3000) replay = replay.slice(-REPLAY_MAX);
 }
 
-// Mecz sieci z klasycznym botem (bez sieci), na zmianę jako gracz 1 i 2
-function runEval(games, depth) {
+function learnFromReplay(updates, lr) {
+    let loss = 0;
+    for (let u = 0; u < updates; u++) {
+        const s = replay[Math.floor(Math.random() * replay.length)];
+        feat.set(s.f);
+        loss += trainStep(s.t, lr);
+    }
+    return loss / Math.max(updates, 1);
+}
+
+// Mecz aktualnej sieci z klasycznym botem (bez sieci), na zmianę jako gracz 1 i 2.
+// Zwraca ułamek punktów (remis = 0,5). timeMs > 0: gra z limitem czasu jak w prawdziwej grze.
+function runEval(games, depth, timeMs) {
     let score = 0;
     for (let g = 0; g < games; g++) {
         const nnSide = g % 2 === 0 ? 1 : 2;
         const r = playGame({
-            depth, eps: 0, tol: 0.3, opening: 2, record: false,
+            depth, timeMs, eps: 0, tol: 0.3, opening: 2, record: false,
             nn: { 1: nnSide === 1, 2: nnSide === 2 }
         });
         score += r.winner === 0 ? 0.5 : (r.winner === nnSide ? 1 : 0);
@@ -623,9 +641,39 @@ function runEval(games, depth) {
     return score / games;
 }
 
+// Przybliżony przedział ufności 95% (połowa szerokości) dla wyniku p z n gier
+function ci95(p, n) {
+    return 1.96 * Math.sqrt(Math.max(p * (1 - p), 0.05) / n);
+}
+
 let training = false;
 let tcfg = null;
 let stats = null;
+let bestScore = -1;
+
+// Sprawdza siłę sieci. Jeśli wynik przebija dotychczasowy rekord, mecz jest powtarzany
+// i dopiero średnia z obu meczów może zostać nowym rekordem (mniej "szczęśliwych" wyników).
+function evaluateAndMaybePromote() {
+    const n = tcfg.evalGames;
+    const a = runEval(n, tcfg.depth, 0);
+    let promoted = false;
+    let weights = null;
+
+    if (a > bestScore) {
+        const b = runEval(n, tcfg.depth, 0);
+        const s = (a + b) / 2;
+        if (s > bestScore) {
+            bestScore = s;
+            weights = serializeNet();
+            promoted = true;
+        }
+    }
+
+    self.postMessage({
+        type: "eval", games: stats.games, score: a, ci: ci95(a, n), n,
+        bestScore, promoted, weights
+    });
+}
 
 function trainLoop() {
     if (!training) return;
@@ -633,21 +681,19 @@ function trainLoop() {
 
     while (training && performance.now() - t0 < 100) {
         const g = playGame({
-            depth: tcfg.depth, eps: tcfg.eps, tol: 0.3, opening: 2, record: true,
+            depth: tcfg.depth, timeMs: 0, eps: tcfg.eps, tol: 0.3, opening: 2, record: true,
             nn: { 1: true, 2: true }
         });
-        stats.loss = learn(g.rec, g.winner, tcfg.lr);
+        addToReplay(g.rec, g.winner);
+
+        // tempo nauki maleje z liczbą gier (do 10% wartości początkowej)
+        const lr = Math.max(tcfg.lr * 0.1, tcfg.lr / (1 + stats.games / 3000));
+        stats.loss = learnFromReplay(Math.min(replay.length, g.rec.length * 4), lr);
+        stats.lr = lr;
         stats.games++;
         stats.plies += g.plies;
 
-        if (stats.games % tcfg.evalEvery === 0) {
-            self.postMessage({
-                type: "eval",
-                games: stats.games,
-                score: runEval(tcfg.evalGames, tcfg.depth),
-                evalGames: tcfg.evalGames
-            });
-        }
+        if (stats.games % tcfg.evalEvery === 0) evaluateAndMaybePromote();
     }
 
     self.postMessage({
@@ -655,6 +701,7 @@ function trainLoop() {
         games: stats.games,
         avgPlies: stats.plies / Math.max(stats.games, 1),
         loss: stats.loss,
+        lr: stats.lr,
         weights: serializeNet()
     });
     setTimeout(trainLoop, 0);               // oddaj sterowanie, żeby worker mógł odebrać "stop"
@@ -671,23 +718,31 @@ self.onmessage = function (e) {
         self.postMessage({ type: "weightsSet", ok: Boolean(net) });
     } else if (m.type === "resetNet") {
         net = newNet();
+        replay = [];
         self.postMessage({ type: "weights", weights: serializeNet() });
     } else if (m.type === "train") {
         if (!net) net = newNet();
         tcfg = m.cfg;
-        stats = { games: 0, plies: 0, loss: 0 };
+        bestScore = typeof m.cfg.bestScore === "number" ? m.cfg.bestScore : -1;
+        stats = { games: 0, plies: 0, loss: 0, lr: m.cfg.lr };
+        replay = [];
         training = true;
         trainLoop();
     } else if (m.type === "stop") {
         training = false;
         if (net) self.postMessage({ type: "weights", weights: serializeNet() });
     } else if (m.type === "eval") {
+        // Ręczny test: wskazanych wag (cfg.weights) albo aktualnej sieci
         if (!net) net = newNet();
-        self.postMessage({
-            type: "eval",
-            games: stats ? stats.games : 0,
-            score: runEval(m.cfg.evalGames, m.cfg.depth),
-            evalGames: m.cfg.evalGames
-        });
+        const keep = net;
+        if (m.cfg.weights) {
+            const w = netFromJSON(m.cfg.weights);
+            if (w) net = w;
+        }
+        const n = m.cfg.evalGames;
+        const timeMs = m.cfg.timeMs || 0;
+        const score = runEval(n, m.cfg.depth, timeMs);
+        net = keep;
+        self.postMessage({ type: "eval", manual: true, timed: timeMs > 0, score, ci: ci95(score, n), n });
     }
 };
