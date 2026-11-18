@@ -95,8 +95,6 @@ window.playOnline = async function () {
     onDisconnect(ref(db, `rooms/${code}/players/${seat}`)).remove();
     touch(code);
 
-    mainMenu.classList.add("hidden");
-    gameScreen.classList.remove("hidden");
     newGame();
 
     unsubMoves = onChildAdded(ref(db, `rooms/${code}/moves`), snap => {

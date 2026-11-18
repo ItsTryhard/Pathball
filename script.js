@@ -1,4 +1,3 @@
-const mainMenu = document.getElementById("mainMenu");
 const gameScreen = document.getElementById("gameScreen");
 
 const canvas = document.getElementById("gameCanvas");
@@ -70,30 +69,10 @@ function updateBackground() {
     gameScreen.style.setProperty("--turn-color", COLORS[currentPlayer]);
 }
 
-// MENU
-
-function playFriend() {
-    if (window.bot) bot.stop();
-    mainMenu.classList.add("hidden");
-    gameScreen.classList.remove("hidden");
-    newGame();
-}
-
-function playBot() {
-    mainMenu.classList.add("hidden");
-    gameScreen.classList.remove("hidden");
-    bot.start();
-    newGame();
-}
-
-function backToMenu() {
-    if (window.bot) bot.stop();
-    if (window.online && window.online.active) window.online.leave();
-
-    gameScreen.classList.add("hidden");
-    mainMenu.classList.remove("hidden");
-    document.body.style.removeProperty("background-color");
-    document.body.style.removeProperty("transition");
+async function backToMenu() {
+    if (window.bot) window.bot.stop();
+    if (window.online && window.online.active) await window.online.leave();
+    window.location.href = "index.html";
 }
 
 // NEW GAME
