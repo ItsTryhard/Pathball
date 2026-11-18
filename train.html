@@ -58,14 +58,6 @@
 </head>
 <body>
 
-    <!-- Atrapy elementów, których wymaga script.js przy wczytaniu (nie są używane) -->
-    <div hidden>
-        <div id="mainMenu"></div>
-        <div id="gameScreen"></div>
-        <canvas id="gameCanvas"></canvas>
-        <button id="orientationToggle"></button>
-    </div>
-
     <main>
         <h1>Trening sieci</h1>
         <p class="hint">Sieć uczy się, grając sama ze sobą. Zostaw tę kartę otwartą, a ekran włączony.</p>
@@ -110,13 +102,6 @@
     </main>
 
     <script>
-        window.PATHBALL_TRAINER = true;
-        // Ładowanie z unikalnym parametrem, żeby przeglądarka nie użyła starej wersji z cache
-        var v = Date.now();
-        document.write('<script src="script.js?v=' + v + '"><\/script>');
-        document.write('<script src="bot.js?v=' + v + '"><\/script>');
-    </script>
-    <script>
         const $ = id => document.getElementById(id);
 
         function log(text) {
@@ -127,14 +112,20 @@
         // Na telefonie nie ma konsoli, więc błędy pokazujemy w logu na stronie
         window.addEventListener("error", e => log("Błąd: " + e.message));
 
-        const worker = window.botWorker;
+        let worker = null;
+        try {
+            worker = new Worker("engine.js?v=" + Date.now());
+            worker.onerror = e => log("Błąd silnika: " + (e.message || "nie można wczytać engine.js (czy plik jest w repo?)"));
+        } catch (err) {
+            log("Błąd: " + err.message);
+        }
         let latest = null;      // ostatnie znane wagi
         let training = false;
         let lastSave = 0;
 
         function ready() {
             if (worker) return true;
-            alert("Silnik bota się nie uruchomił. Wgraj najnowsze script.js i bot.js do repo, poczekaj chwilę i odśwież stronę.");
+            alert("Silnik bota się nie uruchomił. Wgraj engine.js do repo (do tego samego folderu co train.html), poczekaj chwilę i odśwież stronę.");
             return false;
         }
 
@@ -235,7 +226,7 @@
 
         // ===== Komunikacja z workerem =====
         if (!worker) {
-            log("Silnik bota się nie uruchomił (brak window.botWorker). Wgraj najnowsze script.js i bot.js i odśwież stronę.");
+            log("Silnik bota się nie uruchomił. Sprawdź, czy engine.js jest w repo obok train.html.");
         } else {
             worker.addEventListener("message", e => {
                 const m = e.data;
