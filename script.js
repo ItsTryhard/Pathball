@@ -31,6 +31,8 @@ let lines = [];
 let visitedPoints = new Map();
 let gameOver = false;
 let ballAnimation = null;
+let pendingNextPlayer = null;
+let pointEndTimer = null;
 
 const COLORS = {
     1: "#2563eb",
@@ -75,9 +77,125 @@ async function backToMenu() {
     window.location.href = "index.html";
 }
 
+function getSavedGameKey() {
+    if (window.online) return null;
+    return window.bot ? "pathball.bot.game" : "pathball.friend.game";
+}
+
+function saveGame() {
+    const key = getSavedGameKey();
+    if (!key) return;
+
+    localStorage.setItem(key, JSON.stringify({
+        version: 1,
+        ball,
+        currentPlayer,
+        score1,
+        score2,
+        lines,
+        visitedPoints: Array.from(visitedPoints.entries()),
+        gameOver,
+        pendingNextPlayer
+    }));
+}
+
+function isValidSavedGame(saved) {
+    return Boolean(
+        saved &&
+        saved.version === 1 &&
+        saved.ball &&
+        Number.isInteger(saved.ball.x) &&
+        Number.isInteger(saved.ball.y) &&
+        isInsideFieldOrGoal(saved.ball.x, saved.ball.y) &&
+        (saved.currentPlayer === 1 || saved.currentPlayer === 2) &&
+        Number.isInteger(saved.score1) &&
+        saved.score1 >= 0 &&
+        Number.isInteger(saved.score2) &&
+        saved.score2 >= 0 &&
+        Array.isArray(saved.lines) &&
+        saved.lines.every(line =>
+            line &&
+            Number.isInteger(line.x1) &&
+            Number.isInteger(line.y1) &&
+            Number.isInteger(line.x2) &&
+            Number.isInteger(line.y2) &&
+            isInsideFieldOrGoal(line.x1, line.y1) &&
+            isInsideFieldOrGoal(line.x2, line.y2) &&
+            Math.abs(line.x1 - line.x2) <= 1 &&
+            Math.abs(line.y1 - line.y2) <= 1 &&
+            (line.x1 !== line.x2 || line.y1 !== line.y2) &&
+            (line.player === 1 || line.player === 2)
+        ) &&
+        Array.isArray(saved.visitedPoints) &&
+        saved.visitedPoints.every(entry =>
+            Array.isArray(entry) &&
+            entry.length === 2 &&
+            typeof entry[0] === "string" &&
+            (entry[1] === 1 || entry[1] === 2)
+        ) &&
+        typeof saved.gameOver === "boolean" &&
+        (
+            saved.pendingNextPlayer === null ||
+            saved.pendingNextPlayer === 1 ||
+            saved.pendingNextPlayer === 2
+        ) &&
+        (!saved.gameOver || saved.pendingNextPlayer !== null)
+    );
+}
+
+function loadGame() {
+    const key = getSavedGameKey();
+    if (!key) return false;
+
+    const stored = localStorage.getItem(key);
+    if (!stored) return false;
+
+    let saved;
+    try {
+        saved = JSON.parse(stored);
+    } catch (error) {
+        console.warn("Saved game could not be parsed:", error);
+        return false;
+    }
+
+    if (!isValidSavedGame(saved)) {
+        console.warn("Saved game has an invalid format.");
+        return false;
+    }
+
+    ball = saved.ball;
+    currentPlayer = saved.currentPlayer;
+    score1 = saved.score1;
+    score2 = saved.score2;
+    lines = saved.lines;
+    visitedPoints = new Map(saved.visitedPoints);
+    gameOver = saved.gameOver;
+    pendingNextPlayer = saved.pendingNextPlayer;
+    ballAnimation = null;
+
+    if (gameOver) {
+        completePoint(pendingNextPlayer);
+    } else {
+        updateActionButton();
+        updateScore();
+        updateBackground();
+        updateTurn();
+        draw();
+    }
+
+    return true;
+}
+
+function initializeGame() {
+    if (!loadGame()) newGame();
+}
+
 // NEW GAME
 
 function newGame() {
+    clearTimeout(pointEndTimer);
+    pointEndTimer = null;
+    pendingNextPlayer = null;
     ballAnimation = null;
     ball = { x: 4, y: 5 };
     currentPlayer = 1;
@@ -94,6 +212,24 @@ function newGame() {
     updateTurn();
     updateBackground();
     draw();
+    saveGame();
+}
+
+function completePoint(nextPlayer) {
+    ball = { x: 4, y: 5 };
+    lines = [];
+    ballAnimation = null;
+    currentPlayer = nextPlayer;
+    pendingNextPlayer = null;
+
+    visitedPoints = new Map([[`${ball.x},${ball.y}`, currentPlayer]]);
+
+    updateBackground();
+    gameOver = false;
+    updateScore();
+    updateTurn();
+    draw();
+    saveGame();
 }
 
 // Online and bot games: the button is a red "Surrender". Friend games: "New game".
@@ -635,22 +771,12 @@ function finishPoint(winner, message) {
     gameOver = true;
     document.getElementById("turnInfo").textContent = message;
     draw();
+    pendingNextPlayer = currentPlayer === 1 ? 2 : 1;
+    saveGame();
 
-    setTimeout(() => {
+    pointEndTimer = setTimeout(() => {
         alert(message);
-
-        ball = { x: 4, y: 5 };
-        lines = [];
-        ballAnimation = null;
-        currentPlayer = currentPlayer === 1 ? 2 : 1;
-
-        visitedPoints = new Map([[`${ball.x},${ball.y}`, currentPlayer]]);
-
-        updateBackground();
-        gameOver = false;
-
-        updateTurn();
-        draw();
+        completePoint(pendingNextPlayer);
     }, BALL_MOVE_DURATION + 180);
 }
 
@@ -712,6 +838,7 @@ function moveBall(x, y) {
 
     updateTurn();
     draw();
+    saveGame();
 }
 
 // CLICK ON CANVAS
