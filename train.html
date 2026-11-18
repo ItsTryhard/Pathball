@@ -109,20 +109,37 @@
         </div>
     </main>
 
-    <script>window.PATHBALL_TRAINER = true;</script>
-    <script src="script.js"></script>
-    <script src="bot.js"></script>
     <script>
-        const worker = window.botWorker;
+        window.PATHBALL_TRAINER = true;
+        // Ładowanie z unikalnym parametrem, żeby przeglądarka nie użyła starej wersji z cache
+        var v = Date.now();
+        document.write('<script src="script.js?v=' + v + '"><\/script>');
+        document.write('<script src="bot.js?v=' + v + '"><\/script>');
+    </script>
+    <script>
         const $ = id => document.getElementById(id);
-
-        let latest = null;      // ostatnie znane wagi
-        let training = false;
-        let lastSave = 0;
 
         function log(text) {
             const el = $("log");
             el.textContent = new Date().toLocaleTimeString() + "  " + text + "\n" + el.textContent;
+        }
+
+        // Na telefonie nie ma konsoli, więc błędy pokazujemy w logu na stronie
+        window.addEventListener("error", e => log("Błąd: " + e.message));
+
+        const worker = window.botWorker;
+        let latest = null;      // ostatnie znane wagi
+        let training = false;
+        let lastSave = 0;
+
+        function ready() {
+            if (worker) return true;
+            alert("Silnik bota się nie uruchomił. Wgraj najnowsze script.js i bot.js do repo, poczekaj chwilę i odśwież stronę.");
+            return false;
+        }
+
+        function save() {
+            if (latest) localStorage.setItem("pathballNet", JSON.stringify(latest));
         }
 
         function setWeights(json, message) {
@@ -130,44 +147,6 @@
             worker.postMessage({ type: "setWeights", weights: json });
             log(message);
         }
-
-        function save() {
-            if (latest) localStorage.setItem("pathballNet", JSON.stringify(latest));
-        }
-
-        // Start: zapisany postęp > weights.json z repo > nowa sieć
-        try {
-            const saved = JSON.parse(localStorage.getItem("pathballNet"));
-            if (saved) setWeights(saved, "Wczytano zapisany postęp z tego urządzenia.");
-        } catch (e) {}
-
-        if (!latest) {
-            fetch("weights.json", { cache: "no-cache" })
-                .then(r => (r.ok ? r.json() : null))
-                .then(j => { if (j && !latest) setWeights(j, "Wczytano weights.json z repo."); })
-                .catch(() => {});
-        }
-
-        worker.addEventListener("message", e => {
-            const m = e.data;
-
-            if (m.type === "progress") {
-                $("games").textContent = m.games;
-                $("plies").textContent = m.avgPlies.toFixed(1);
-                $("loss").textContent = m.loss.toFixed(4);
-                latest = m.weights;
-                if (Date.now() - lastSave > 3000) { save(); lastSave = Date.now(); }
-            } else if (m.type === "eval") {
-                const pct = Math.round(m.score * 100);
-                $("eval").textContent = pct + "% (" + m.evalGames + " gier)";
-                log("Po " + m.games + " grach: " + pct + "% punktów z klasycznym botem.");
-            } else if (m.type === "weights") {
-                latest = m.weights;
-                save();
-            } else if (m.type === "weightsSet" && !m.ok) {
-                log("Nie udało się wczytać wag (zły format).");
-            }
-        });
 
         function config() {
             return {
@@ -179,7 +158,14 @@
             };
         }
 
+        function needWeights() {
+            if (!latest) { alert("Najpierw uruchom trening choć na chwilę."); return true; }
+            return false;
+        }
+
+        // ===== Przyciski (podpinane od razu, niezależnie od workera) =====
         $("startBtn").onclick = () => {
+            if (!ready()) return;
             training = !training;
             $("startBtn").textContent = training ? "Stop" : "Start";
             $("startBtn").classList.toggle("stop", training);
@@ -194,14 +180,10 @@
         };
 
         $("evalBtn").onclick = () => {
+            if (!ready()) return;
             log("Sprawdzam siłę (40 gier)...");
             worker.postMessage({ type: "eval", cfg: config() });
         };
-
-        function needWeights() {
-            if (!latest) { alert("Najpierw uruchom trening choć na chwilę."); return true; }
-            return false;
-        }
 
         $("downloadBtn").onclick = () => {
             if (needWeights()) return;
@@ -224,6 +206,7 @@
         };
 
         $("fileInput").onchange = async e => {
+            if (!ready()) return;
             const file = e.target.files[0];
             if (!file) return;
             try {
@@ -235,6 +218,7 @@
         };
 
         $("resetBtn").onclick = () => {
+            if (!ready()) return;
             if (!confirm("Usunąć cały postęp i zacząć od nowej sieci?")) return;
             training = false;
             $("startBtn").textContent = "Start";
@@ -248,6 +232,47 @@
             $("eval").textContent = "-";
             log("Sieć zresetowana.");
         };
+
+        // ===== Komunikacja z workerem =====
+        if (!worker) {
+            log("Silnik bota się nie uruchomił (brak window.botWorker). Wgraj najnowsze script.js i bot.js i odśwież stronę.");
+        } else {
+            worker.addEventListener("message", e => {
+                const m = e.data;
+
+                if (m.type === "progress") {
+                    $("games").textContent = m.games;
+                    $("plies").textContent = m.avgPlies.toFixed(1);
+                    $("loss").textContent = m.loss.toFixed(4);
+                    latest = m.weights;
+                    if (Date.now() - lastSave > 3000) { save(); lastSave = Date.now(); }
+                } else if (m.type === "eval") {
+                    const pct = Math.round(m.score * 100);
+                    $("eval").textContent = pct + "% (" + m.evalGames + " gier)";
+                    log("Po " + m.games + " grach: " + pct + "% punktów z klasycznym botem.");
+                } else if (m.type === "weights") {
+                    latest = m.weights;
+                    save();
+                } else if (m.type === "weightsSet" && !m.ok) {
+                    log("Nie udało się wczytać wag (zły format).");
+                }
+            });
+
+            // Start: zapisany postęp > weights.json z repo > nowa sieć
+            try {
+                const saved = JSON.parse(localStorage.getItem("pathballNet"));
+                if (saved) setWeights(saved, "Wczytano zapisany postęp z tego urządzenia.");
+            } catch (e) {}
+
+            if (!latest) {
+                fetch("weights.json", { cache: "no-cache" })
+                    .then(r => (r.ok ? r.json() : null))
+                    .then(j => { if (j && !latest) setWeights(j, "Wczytano weights.json z repo."); })
+                    .catch(() => {});
+            }
+
+            log("Silnik gotowy.");
+        }
     </script>
 </body>
 </html>
