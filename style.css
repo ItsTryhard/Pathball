@@ -505,3 +505,55 @@ button:focus-visible {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* ONLINE LOBBY (matchmaking) */
+
+.lobbyOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    background: rgba(8, 13, 24, 0.82);
+    backdrop-filter: blur(6px);
+}
+
+.lobbyOverlay.hidden,
+.lobbyOverlay .hidden {
+    display: none !important;
+}
+
+.lobbyCard {
+    width: min(100%, 420px);
+    padding: clamp(28px, 6vw, 48px);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 30px;
+    background: linear-gradient(145deg, rgba(24, 35, 57, 0.95), rgba(11, 18, 32, 0.97));
+    box-shadow: 0 32px 90px rgba(0, 0, 0, 0.45);
+    text-align: center;
+}
+
+.lobbyStatus {
+    min-height: 1.4em;
+    margin: 0 0 24px;
+    color: #a7b3c7;
+    font-size: 16px;
+}
+
+.lobbyStatus.searching::after {
+    content: "";
+    display: block;
+    width: 34px;
+    height: 34px;
+    margin: 22px auto 0;
+    border: 3px solid rgba(147, 197, 253, 0.25);
+    border-top-color: #93c5fd;
+    border-radius: 50%;
+    animation: lobbySpin 900ms linear infinite;
+}
+
+@keyframes lobbySpin {
+    to { transform: rotate(360deg); }
+}

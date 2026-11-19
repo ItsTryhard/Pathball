@@ -73,7 +73,7 @@ function updateBackground() {
 
 async function backToMenu() {
     if (window.bot) window.bot.stop();
-    if (window.online && window.online.active) await window.online.leave();
+    if (window.online) await window.online.leave();
     window.location.href = "index.html";
 }
 
