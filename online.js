@@ -249,7 +249,8 @@ async function heartbeat(myId) {
     }, 3000);
 }
 
-// Kończy wyszukiwanie (lokalnie) i zwalnia miejsce w poczekalni, jeśli jest nasze
+// Kończy wyszukiwanie (lokalnie) i zwalnia miejsce w poczekalni, jeśli jest nasze.
+// Zwraca obietnicę, żeby można było poczekać na usunięcie wpisu (np. przed wyjściem do menu).
 function stopSearch() {
     const myId = mm.id;
     online.searching = false;
@@ -258,11 +259,11 @@ function stopSearch() {
     clearTimeout(mm.retryTimer);
     if (mm.unsubMatch) mm.unsubMatch();
     mm.unsubMatch = null;
-    if (!myId) return;
+    if (!myId) return Promise.resolve();
 
     onDisconnect(ref(db, WAITING_PATH)).cancel();
     onDisconnect(ref(db, `${MATCHES_PATH}/${myId}`)).cancel();
-    runTransaction(ref(db, WAITING_PATH), cur => {
+    return runTransaction(ref(db, WAITING_PATH), cur => {
         if (cur && cur.id === myId) return null;
         return;
     }).catch(() => {});
@@ -342,6 +343,6 @@ async function leaveRoom() {
 }
 
 online.leave = async () => {
-    if (online.searching) stopSearch();
+    if (online.searching) await stopSearch();
     await leaveRoom();
 };
