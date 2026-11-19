@@ -44,6 +44,7 @@
         timeLimit: BALL_MOVE_DURATION,  // limit czasu na ruch w ms (tyle co animacja)
         tolerance: 0.3,                 // losowość wśród ruchów o prawie równej ocenie
         useNN: true,                    // false = zawsze klasyczna ocena
+        classic: location.search.indexOf("classic=euclid") !== -1 ? "euclid" : "paths",   // klasyczna ocena: "paths" (nowa) lub "euclid" (stara, przez ?classic=euclid)
         lastDepth: 0,                   // do podglądu: jak głęboko bot doszedł w ostatnim ruchu
         requestId: 0,
         readyMove: null,
@@ -78,7 +79,8 @@
                 player: this.player,
                 timeLimit: this.timeLimit,
                 tolerance: this.tolerance,
-                useNN: this.useNN
+                useNN: this.useNN,
+                classic: this.classic
             });
         },
 
@@ -102,4 +104,3 @@
 
     window.bot = bot;
 })();
-

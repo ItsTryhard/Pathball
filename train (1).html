@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pathball - trening sieci</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 16px;
+            background: #080d18;
+            color: #e2e8f0;
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        }
+        main { max-width: 520px; margin: 0 auto; }
+        h1 { font-size: 22px; margin: 0 0 4px; }
+        p.hint { color: #94a3b8; font-size: 13px; margin: 0 0 16px; }
+        .card {
+            background: #101a2b;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 14px;
+        }
+        .row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .row label { flex: 1; font-size: 12px; color: #94a3b8; }
+        input, select {
+            width: 100%;
+            margin-top: 4px;
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            background: #0b1220;
+            color: white;
+            font-size: 15px;
+        }
+        button, .btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin-top: 8px;
+            border: 0;
+            border-radius: 10px;
+            background: #2563eb;
+            color: white;
+            font-size: 15px;
+            font-weight: bold;
+            text-align: center;
+            text-decoration: none;
+        }
+        button.stop { background: #dc2626; }
+        button.grey, .btn.grey { background: #334155; }
+        .stat { display: flex; justify-content: space-between; padding: 4px 0; font-size: 15px; }
+        .stat b { color: white; }
+        #log { font-size: 12px; color: #94a3b8; max-height: 160px; overflow-y: auto; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+
+    <main>
+        <h1>Trening sieci</h1>
+        <p class="hint">Sieć uczy się, grając sama ze sobą. Zostaw tę kartę otwartą, a ekran włączony.</p>
+
+        <div class="card">
+            <div class="row">
+                <label>Głębokość
+                    <select id="depth">
+                        <option value="2">2 (szybko)</option>
+                        <option value="3" selected>3</option>
+                        <option value="4">4 (wolno)</option>
+                    </select>
+                </label>
+                <label>Losowe ruchy
+                    <input id="eps" type="number" value="0.05" step="0.05" min="0" max="0.5">
+                </label>
+                <label>Tempo nauki
+                    <input id="lr" type="number" value="0.005" step="0.005" min="0.001" max="0.1">
+                </label>
+            </div>
+            <button id="startBtn">Start</button>
+            <button id="evalBtn" class="grey">Sprawdź siłę (100 gier)</button>
+            <button id="evalTimedBtn" class="grey">Test jak w grze (30 gier, wolny)</button>
+            <button id="arenaBtn" class="grey">Nowa ocena klasyczna vs stara (40 gier)</button>
+        </div>
+
+        <div class="card">
+            <div class="stat"><span>Rozegrane gry</span><b id="games">0</b></div>
+            <div class="stat"><span>Średnia długość gry (ruchy)</span><b id="plies">-</b></div>
+            <div class="stat"><span>Błąd nauki (loss)</span><b id="loss">-</b></div>
+            <div class="stat"><span>Ostatni wynik z klasycznym botem</span><b id="eval">-</b></div>
+            <div class="stat"><span>Najlepsza potwierdzona sieć</span><b id="best">-</b></div>
+            <div id="log"></div>
+        </div>
+
+        <div class="card">
+            <a id="testLink" class="btn" href="bot.html?net=local">Zagraj z najlepszą siecią (vs bot)</a>
+            <button id="downloadBtn" class="grey">Pobierz weights.json (najlepsza)</button>
+            <button id="copyBtn" class="grey">Kopiuj wagi (najlepsza)</button>
+            <label style="display:block; margin-top:8px; font-size:12px; color:#94a3b8;">Wczytaj wagi z pliku
+                <input id="fileInput" type="file" accept=".json,application/json">
+            </label>
+            <button id="resetBtn" class="grey">Zacznij od nowa (reset sieci)</button>
+        </div>
+    </main>
+
+    <script>
+        const $ = id => document.getElementById(id);
+
+        function log(text) {
+            const el = $("log");
+            el.textContent = new Date().toLocaleTimeString() + "  " + text + "\n" + el.textContent;
+        }
+
+        // Na telefonie nie ma konsoli, więc błędy pokazujemy w logu na stronie
+        window.addEventListener("error", e => log("Błąd: " + e.message));
+
+        function readJSON(key) {
+            try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; }
+        }
+
+        let worker = null;
+        try {
+            worker = new Worker("engine.js?v=" + Date.now());
+            worker.onerror = e => log("Błąd silnika: " + (e.message || "nie można wczytać engine.js (czy plik jest w repo?)"));
+        } catch (err) {
+            log("Błąd: " + err.message);
+        }
+
+        // Dwa zestawy wag:
+        //  latest = ostatnie wagi treningu (do wznawiania nauki),
+        //  best   = najlepsza potwierdzona sieć (do gry, pobierania i kopiowania).
+        let best = readJSON("pathballNet");
+        let latest = readJSON("pathballNetTrain") || best;
+        const storedScore = parseFloat(localStorage.getItem("pathballBestScore"));
+        let bestScore = isNaN(storedScore) ? -1 : storedScore;
+        let training = false;
+        let lastSave = 0;
+
+        function ready() {
+            if (worker) return true;
+            alert("Silnik bota się nie uruchomił. Wgraj engine.js do repo (do tego samego folderu co train.html), poczekaj chwilę i odśwież stronę.");
+            return false;
+        }
+
+        function saveTrain() {
+            if (latest) localStorage.setItem("pathballNetTrain", JSON.stringify(latest));
+        }
+
+        function saveBest() {
+            if (best) localStorage.setItem("pathballNet", JSON.stringify(best));
+            localStorage.setItem("pathballBestScore", String(bestScore));
+        }
+
+        function showBest() {
+            $("best").textContent = bestScore >= 0 ? Math.round(bestScore * 100) + "%" : "-";
+        }
+
+        function exportWeights() {
+            return best || latest;
+        }
+
+        function setWeights(json, message) {
+            worker.postMessage({ type: "setWeights", weights: json });
+            log(message);
+        }
+
+        function config() {
+            return {
+                depth: Number($("depth").value),
+                eps: Number($("eps").value),
+                lr: Number($("lr").value),
+                evalEvery: 500,
+                evalGames: 100,
+                bestScore: bestScore
+            };
+        }
+
+        function needWeights() {
+            if (!exportWeights()) { alert("Najpierw uruchom trening choć na chwilę."); return true; }
+            return false;
+        }
+
+        showBest();
+
+        // ===== Przyciski (podpinane od razu, niezależnie od workera) =====
+        $("startBtn").onclick = () => {
+            if (!ready()) return;
+            training = !training;
+            $("startBtn").textContent = training ? "Stop" : "Start";
+            $("startBtn").classList.toggle("stop", training);
+
+            if (training) {
+                worker.postMessage({ type: "train", cfg: config() });
+                log("Start treningu.");
+            } else {
+                worker.postMessage({ type: "stop" });
+                log("Zatrzymano. Postęp zapisany.");
+            }
+        };
+
+        $("evalBtn").onclick = () => {
+            if (!ready()) return;
+            log("Sprawdzam siłę najlepszej sieci (100 gier)...");
+            worker.postMessage({
+                type: "eval",
+                cfg: { depth: Number($("depth").value), evalGames: 100, timeMs: 0, weights: exportWeights() }
+            });
+        };
+
+        $("evalTimedBtn").onclick = () => {
+            if (!ready()) return;
+            log("Test jak w grze (30 gier, 25 ms na ruch). To potrwa ok. minuty...");
+            worker.postMessage({
+                type: "eval",
+                cfg: { depth: Number($("depth").value), evalGames: 30, timeMs: 25, weights: exportWeights() }
+            });
+        };
+
+        $("arenaBtn").onclick = () => {
+            if (!ready()) return;
+            log("Porównuję nową klasyczną ocenę ze starą (40 gier, 20 ms na ruch). To potrwa ok. minuty...");
+            worker.postMessage({ type: "arena", cfg: { games: 40, depth: 3, timeMs: 20 } });
+        };
+
+        $("testLink").onclick = () => {
+            if (!best && latest) localStorage.setItem("pathballNet", JSON.stringify(latest));
+        };
+
+        $("downloadBtn").onclick = () => {
+            if (needWeights()) return;
+            const blob = new Blob([JSON.stringify(exportWeights())], { type: "application/json" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "weights.json";
+            a.click();
+        };
+
+        $("copyBtn").onclick = async () => {
+            if (needWeights()) return;
+            try {
+                await navigator.clipboard.writeText(JSON.stringify(exportWeights()));
+                log("Wagi skopiowane. Wklej je do pliku weights.json w repo.");
+            } catch (e) {
+                alert("Nie udało się skopiować. Użyj przycisku Pobierz.");
+            }
+        };
+
+        $("fileInput").onchange = async e => {
+            if (!ready()) return;
+            const file = e.target.files[0];
+            if (!file) return;
+            try {
+                const json = JSON.parse(await file.text());
+                latest = json;
+                best = json;
+                bestScore = -1;
+                setWeights(json, "Wczytano wagi z pliku (traktowane jako najlepsze, dopóki trening nie znajdzie lepszych).");
+                saveTrain();
+                saveBest();
+                showBest();
+            } catch (err) {
+                alert("To nie wygląda na plik weights.json.");
+            }
+        };
+
+        $("resetBtn").onclick = () => {
+            if (!ready()) return;
+            if (!confirm("Usunąć cały postęp (także najlepszą sieć) i zacząć od nowej sieci?")) return;
+            training = false;
+            $("startBtn").textContent = "Start";
+            $("startBtn").classList.remove("stop");
+            worker.postMessage({ type: "stop" });
+            localStorage.removeItem("pathballNet");
+            localStorage.removeItem("pathballNetTrain");
+            localStorage.removeItem("pathballBestScore");
+            best = null;
+            latest = null;
+            bestScore = -1;
+            worker.postMessage({ type: "resetNet" });
+            $("games").textContent = "0";
+            $("plies").textContent = "-";
+            $("loss").textContent = "-";
+            $("eval").textContent = "-";
+            showBest();
+            log("Sieć zresetowana.");
+        };
+
+        // ===== Komunikacja z workerem =====
+        if (!worker) {
+            log("Silnik bota się nie uruchomił. Sprawdź, czy engine.js jest w repo obok train.html.");
+        } else {
+            worker.addEventListener("message", e => {
+                const m = e.data;
+
+                if (m.type === "progress") {
+                    $("games").textContent = m.games;
+                    $("plies").textContent = m.avgPlies.toFixed(1);
+                    $("loss").textContent = m.loss.toFixed(4);
+                    latest = m.weights;
+                    if (Date.now() - lastSave > 3000) { saveTrain(); lastSave = Date.now(); }
+                } else if (m.type === "eval") {
+                    const text = Math.round(m.score * 100) + "% ±" + Math.round(m.ci * 100) + "% (" + m.n + " gier)";
+
+                    if (m.manual) {
+                        log((m.timed ? "Test jak w grze: " : "Test szybki: ") + text + ".");
+                    } else {
+                        $("eval").textContent = text;
+                        if (m.promoted) {
+                            best = m.weights;
+                            bestScore = m.bestScore;
+                            saveBest();
+                            showBest();
+                            log("Po " + m.games + " grach: " + text + ". Nowa najlepsza sieć (potwierdzone: " + Math.round(m.bestScore * 100) + "%).");
+                        } else {
+                            log("Po " + m.games + " grach: " + text + ".");
+                        }
+                    }
+                } else if (m.type === "arena") {
+                    log("Nowa ocena vs stara: " + Math.round(m.score * 100) + "% ±" + Math.round(m.ci * 100) + "% (" + m.n + " gier).");
+                } else if (m.type === "weights") {
+                    latest = m.weights;
+                    saveTrain();
+                } else if (m.type === "weightsSet" && !m.ok) {
+                    log("Nie udało się wczytać wag (zły format).");
+                }
+            });
+
+            // Start: zapisany postęp > weights.json z repo > nowa sieć
+            if (latest) {
+                setWeights(latest, "Wczytano zapisany postęp z tego urządzenia.");
+            } else {
+                fetch("weights.json", { cache: "no-cache" })
+                    .then(r => (r.ok ? r.json() : null))
+                    .then(j => {
+                        if (j && !latest) {
+                            latest = j;
+                            best = j;
+                            setWeights(j, "Wczytano weights.json z repo.");
+                        }
+                    })
+                    .catch(() => {});
+            }
+
+            log("Silnik gotowy.");
+        }
+    </script>
+</body>
+</html>
