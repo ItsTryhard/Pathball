@@ -50,7 +50,28 @@ const lobbyStatus = document.getElementById("lobbyStatus");
 const lobbyChoices = document.getElementById("lobbyChoices");
 const lobbyCancel = document.getElementById("lobbyCancel");
 
+// Gdy lobby jest otwarte (wybór trybu albo szukanie przeciwnika), chowamy planszę i resztę ekranu gry.
+// Samo lobby (i wszystko w nim) zostaje widoczne.
+const lobbyStyle = document.createElement("style");
+lobbyStyle.textContent = `
+    body.lobby-open #gameScreen { visibility: hidden; }
+    body.lobby-open #onlineLobby,
+    body.lobby-open #onlineLobby * { visibility: visible; }
+`;
+document.head.appendChild(lobbyStyle);
+
+// Przycisk wyjścia do menu w lobby (dodawany tylko, jeśli lobby nie ma własnego),
+// bo przycisk z ekranu gry jest teraz schowany.
+if (!lobby.querySelector('[onclick*="backToMenu"], a[href], #lobbyBack, .backButton')) {
+    const lobbyBack = document.createElement("button");
+    lobbyBack.className = "backButton";
+    lobbyBack.textContent = "Back to menu";
+    lobbyBack.onclick = () => backToMenu();
+    (lobbyChoices.parentElement || lobby).appendChild(lobbyBack);
+}
+
 function showLobby(status = "", searching = false) {
+    document.body.classList.add("lobby-open");
     lobby.classList.remove("hidden");
     lobbyStatus.textContent = status;
     lobbyStatus.classList.toggle("searching", searching);
@@ -59,6 +80,7 @@ function showLobby(status = "", searching = false) {
 }
 
 function hideLobby() {
+    document.body.classList.remove("lobby-open");
     lobby.classList.add("hidden");
 }
 
