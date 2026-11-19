@@ -30,6 +30,22 @@
             </svg>
         </button>
     </div>
+
+    <div id="onlineLobby" class="lobbyOverlay hidden">
+        <div class="menuCard lobbyCard">
+            <p class="eyebrow">PLAY ONLINE</p>
+            <p id="lobbyStatus" class="lobbyStatus"></p>
+            <div id="lobbyChoices" class="buttons">
+                <button id="lobbyQuick">Quick match</button>
+                <button id="lobbyCreate">Create private room</button>
+                <button id="lobbyJoin">Join with code</button>
+                <button onclick="backToMenu()">Back to menu</button>
+            </div>
+            <div class="buttons">
+                <button id="lobbyCancel" class="hidden">Cancel</button>
+            </div>
+        </div>
+    </div>
     <script src="script.js"></script>
     <script type="module" src="online.js"></script>
     <script>
