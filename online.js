@@ -37,6 +37,7 @@ let pump = null;
 
 // Stan wyszukiwania przeciwnika
 const mm = { id: null, heartbeat: null, unsubMatch: null, retryTimer: null };
+const myIds = new Set();   // wszystkie identyfikatory wyszukiwań z tej karty (żeby nie sparować się z samym sobą)
 
 // Czas serwera (różnica zegarów klientów nie psuje wykrywania starych wpisów)
 let serverOffset = 0;
@@ -183,6 +184,7 @@ async function findMatch(message = "Searching for an opponent…") {
 
     online.searching = true;
     const myId = push(ref(db, MATCHES_PATH)).key;   // sam klucz, nic nie zapisuje
+    myIds.add(myId);
     mm.id = myId;
     showLobby(message, true);
 
@@ -190,7 +192,8 @@ async function findMatch(message = "Searching for an opponent…") {
     try {
         await runTransaction(ref(db, WAITING_PATH), cur => {
             opponentId = null;
-            if (cur && cur.id !== myId && serverNow() - cur.ts < QUEUE_STALE_MS) {
+            // wpis z wcześniejszego wyszukiwania z tej samej karty to nie przeciwnik
+            if (cur && !myIds.has(cur.id) && serverNow() - cur.ts < QUEUE_STALE_MS) {
                 opponentId = cur.id;   // ktoś czeka – zabieramy go
                 return null;
             }
@@ -235,7 +238,9 @@ async function heartbeat(myId) {
     let mine = false;
     await runTransaction(ref(db, WAITING_PATH), cur => {
         mine = Boolean(cur && cur.id === myId);
-        if (!mine) return;                               // nic nie zmieniaj
+        // Nie zwracamy undefined (to przerywa transakcję bez sprawdzenia serwera, gdy lokalna
+        // pamięć jest pusta). Zwrócenie cur = "nic nie zmieniaj", a baza sprawdzi prawdziwą wartość.
+        if (!mine) return cur;
         return { id: myId, ts: serverNow() };
     }).catch(() => {});
 
@@ -264,8 +269,8 @@ function stopSearch() {
     onDisconnect(ref(db, WAITING_PATH)).cancel();
     onDisconnect(ref(db, `${MATCHES_PATH}/${myId}`)).cancel();
     return runTransaction(ref(db, WAITING_PATH), cur => {
-        if (cur && cur.id === myId) return null;
-        return;
+        // usuń tylko swój wpis; w innym wypadku zwróć cur (nie undefined, patrz heartbeat)
+        return cur && cur.id === myId ? null : cur;
     }).catch(() => {});
 }
 
