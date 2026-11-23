@@ -71,6 +71,7 @@ if (!lobby.querySelector('[onclick*="backToMenu"], a[href], #lobbyBack, .backBut
 }
 
 function showLobby(status = "", searching = false) {
+    if (window.hideGameOver) window.hideGameOver();
     document.body.classList.add("lobby-open");
     lobby.classList.remove("hidden");
     lobbyStatus.textContent = status;
@@ -117,8 +118,7 @@ function startPump() {
             newGame();
         } else if (m.t === "surrender") {
             const winner = m.p === 1 ? 2 : 1;
-            alert("Player " + m.p + " surrendered. Player " + winner + " wins!");
-            newGame();
+            endGameDialog(winner, "Player " + m.p + " surrendered.", newGame);
         } else {
             moveBall(m.x, m.y);
         }
