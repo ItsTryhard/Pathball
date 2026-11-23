@@ -85,6 +85,70 @@ function hideLobby() {
     lobby.classList.add("hidden");
 }
 
+// ===== Kod pokoju na ekranie gry (zamiast alertu) =====
+// Pokazujemy go w linii z podpowiedzią pod planszą (".instructions"), a po wyjściu z pokoju
+// przywracamy dawny tekst. Dotknięcie linii kopiuje kod do schowka.
+const roomStyle = document.createElement("style");
+roomStyle.textContent = `
+    .instructions.roomCode {
+        color: #e2e8f0;
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.5;
+        white-space: pre-line;
+        cursor: pointer;
+    }
+`;
+document.head.appendChild(roomStyle);
+
+let roomState = null;   // { code, seat, opponentHere } albo null, gdy nie jesteśmy w pokoju prywatnym
+
+function renderRoomCode(flash) {
+    let el = document.querySelector(".instructions");
+
+    if (!roomState) {
+        if (!el) return;
+        if (el.dataset.original !== undefined) el.textContent = el.dataset.original;
+        el.classList.remove("roomCode");
+        el.title = "";
+        el.onclick = null;
+        return;
+    }
+
+    if (!el) {
+        el = document.createElement("p");
+        el.className = "instructions";
+        document.getElementById("turnInfo").after(el);
+    }
+    if (el.dataset.original === undefined) el.dataset.original = el.textContent;
+
+    const { code, seat, opponentHere } = roomState;
+    const color = seat === 1 ? "blue" : "red";
+    const status = `You are Player ${seat} (${color}) · ` +
+        (opponentHere ? "opponent connected" : "waiting for opponent");
+
+    el.textContent = `Room code: ${code}\n` + (flash || status);
+    el.classList.add("roomCode");
+    el.title = "Tap to copy the code";
+    el.onclick = () => {
+        if (!roomState || !navigator.clipboard) return;
+        navigator.clipboard.writeText(roomState.code).then(() => {
+            renderRoomCode("Code copied!");
+            setTimeout(() => renderRoomCode(), 1200);
+        }).catch(() => {});
+    };
+}
+
+function showRoomCode(code, seat, opponentHere) {
+    roomState = { code, seat, opponentHere };
+    renderRoomCode();
+}
+
+function hideRoomCode() {
+    roomState = null;
+    renderRoomCode();
+}
+
 // Zapisuje czas ostatniej aktywności w pokoju
 function touch(code) {
     set(ref(db, `rooms/${code}/lastActive`), serverTimestamp());
@@ -157,6 +221,7 @@ async function joinRoom(code, matched) {
     hideLobby();
     newGame();
     updateActionButton();
+    if (matched) hideRoomCode(); else showRoomCode(code, seat, false);
 
     unsubMoves = onChildAdded(ref(db, `rooms/${code}/moves`), snap => {
         queue.push(snap.val());
@@ -184,6 +249,7 @@ function watchPlayers(code, matched) {
         if (online.room !== code) return;
         const players = snap.val() || {};
         const opponentHere = Boolean(players[3 - online.me]);
+        if (!matched) showRoomCode(code, online.me, opponentHere);
 
         if (opponentHere && !opponentSeen) {
             opponentSeen = true;
@@ -309,7 +375,6 @@ async function playPrivate(code) {
 
     const seat = await joinRoom(code, false);
     if (!seat) { showLobby("That room is full."); return; }
-    alert(`Room code: ${code}\nYou are Player ${seat}.`);
 }
 
 window.playOnline = function () {
@@ -352,6 +417,7 @@ async function leaveRoom() {
     if (unsubPlayers) unsubPlayers();
     unsubMoves = unsubPlayers = null;
     clearInterval(pump);
+    hideRoomCode();
     updateActionButton();
 
     onDisconnect(ref(db, `rooms/${room}/players/${seat}`)).cancel();
