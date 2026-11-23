@@ -190,6 +190,35 @@ function initializeGame() {
     if (!loadGame()) newGame();
 }
 
+let gameOverScript = null;   // wczytanie gameover.js (tylko raz)
+
+function loadGameOverUI() {
+    if (window.showGameOver) return Promise.resolve(true);
+    if (!gameOverScript) {
+        gameOverScript = new Promise(resolve => {
+            const s = document.createElement("script");
+            s.src = "gameover.js";
+            s.onload = () => resolve(true);
+            s.onerror = () => resolve(false);
+            document.head.appendChild(s);
+        });
+    }
+    return gameOverScript;
+}
+
+// Koniec gry: okienko Game over (gameover.js). Gdyby się nie wczytało, zwykły alert.
+function endGameDialog(winner, message, onRematch) {
+    gameOver = true;    // plansza zamrożona do czasu wyboru Rematch / Back to menu
+    loadGameOverUI().then(ok => {
+        if (ok) {
+            showGameOver({ winner, message, score1, score2, onRematch });
+        } else {
+            alert(message);
+            onRematch();
+        }
+    });
+}
+
 // NEW GAME
 
 function newGame() {
@@ -255,8 +284,7 @@ function restartClick() {
         }
     } else if (window.bot && window.bot.active) {
         if (confirm("Surrender? The bot will win.")) {
-            alert("You surrendered. The bot wins!");
-            newGame();
+                        endGameDialog(window.bot.player, "You surrendered. The bot wins!", newGame);
         }
     } else {
         newGame();
@@ -775,7 +803,6 @@ function finishPoint(winner, message) {
     saveGame();
 
     pointEndTimer = setTimeout(() => {
-        alert(message);
         completePoint(pendingNextPlayer);
     }, BALL_MOVE_DURATION + 180);
 }
