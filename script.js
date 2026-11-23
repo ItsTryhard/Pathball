@@ -803,7 +803,7 @@ function finishPoint(winner, message) {
     saveGame();
 
     pointEndTimer = setTimeout(() => {
-        completePoint(pendingNextPlayer);
+        endGameDialog(winner, message, () => completePoint(pendingNextPlayer));
     }, BALL_MOVE_DURATION + 180);
 }
 
