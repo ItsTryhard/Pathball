@@ -33,6 +33,8 @@ let gameOver = false;
 let ballAnimation = null;
 let pendingNextPlayer = null;
 let pointEndTimer = null;
+let gameMode = "normal";   // "normal" albo "double" (2 ruchy z rzędu, tylko gra z przyjacielem)
+let turnMoves = 0;         // zwykłe (bez odbicia) ruchy wykonane w bieżącej turze
 
 const COLORS = {
     1: "#2563eb",
@@ -77,6 +79,17 @@ async function backToMenu() {
     window.location.href = "index.html";
 }
 
+// Tryby gry (okienko wyboru) są tylko w grze z przyjacielem, czyli na stronie friend.html
+function isFriendGame() {
+    return !window.bot && !window.online &&
+        /(^|\/)friend(\.html)?\/?$/.test(window.location.pathname);
+}
+
+// Ile zwykłych ruchów trwa tura: "double" = 2 ruchy z rzędu (odbicia nadal dają ruch dodatkowy)
+function movesPerTurn() {
+    return gameMode === "double" ? 2 : 1;
+}
+
 function getSavedGameKey() {
     if (window.online) return null;
     return window.bot ? "pathball.bot.game" : "pathball.friend.game";
@@ -95,7 +108,9 @@ function saveGame() {
         lines,
         visitedPoints: Array.from(visitedPoints.entries()),
         gameOver,
-        pendingNextPlayer
+        pendingNextPlayer,
+        mode: gameMode,
+        turnMoves
     }));
 }
 
@@ -139,7 +154,9 @@ function isValidSavedGame(saved) {
             saved.pendingNextPlayer === 1 ||
             saved.pendingNextPlayer === 2
         ) &&
-        (!saved.gameOver || saved.pendingNextPlayer !== null)
+        (!saved.gameOver || saved.pendingNextPlayer !== null) &&
+        (saved.mode === undefined || saved.mode === "normal" || saved.mode === "double") &&
+        (saved.turnMoves === undefined || (Number.isInteger(saved.turnMoves) && saved.turnMoves >= 0))
     );
 }
 
@@ -171,6 +188,8 @@ function loadGame() {
     visitedPoints = new Map(saved.visitedPoints);
     gameOver = saved.gameOver;
     pendingNextPlayer = saved.pendingNextPlayer;
+    gameMode = saved.mode === "double" ? "double" : "normal";
+    turnMoves = saved.turnMoves || 0;
     ballAnimation = null;
 
     if (gameOver) {
@@ -187,7 +206,16 @@ function loadGame() {
 }
 
 function initializeGame() {
-    if (!loadGame()) newGame();
+    if (loadGame()) return;
+
+    if (isFriendGame()) {
+        // Nowa gra z przyjacielem: najpierw wybór trybu
+        updateActionButton();
+        draw();
+        chooseGameMode(false, newGame);
+    } else {
+        newGame();
+    }
 }
 
 let gameOverScript = null;   // wczytanie gameover.js (tylko raz)
@@ -219,12 +247,34 @@ function endGameDialog(winner, message, onRematch) {
     });
 }
 
+// Okienko wyboru trybu (gameover.js). canCancel: dolny przycisk to Cancel (nic się nie zmienia),
+// w przeciwnym razie Back to menu. Gdyby okienko się nie wczytało, zostaje obecny tryb.
+function chooseGameMode(canCancel, onChosen) {
+    loadGameOverUI().then(ok => {
+        if (!ok || !window.showModeSelect) {
+            onChosen();
+            return;
+        }
+
+        showModeSelect({
+            current: gameMode,
+            cancelLabel: canCancel ? "Cancel" : undefined,
+            onCancel: canCancel ? () => {} : undefined,
+            onChoose: id => {
+                gameMode = id;
+                onChosen();
+            }
+        });
+    });
+}
+
 // NEW GAME
 
 function newGame() {
     clearTimeout(pointEndTimer);
     pointEndTimer = null;
     pendingNextPlayer = null;
+    turnMoves = 0;
     ballAnimation = null;
     ball = { x: 4, y: 5 };
     currentPlayer = 1;
@@ -250,6 +300,7 @@ function completePoint(nextPlayer) {
     ballAnimation = null;
     currentPlayer = nextPlayer;
     pendingNextPlayer = null;
+    turnMoves = 0;
 
     visitedPoints = new Map([[`${ball.x},${ball.y}`, currentPlayer]]);
 
@@ -284,10 +335,11 @@ function restartClick() {
         }
     } else if (window.bot && window.bot.active) {
         if (confirm("Surrender? The bot will win.")) {
-                        endGameDialog(window.bot.player, "You surrendered. The bot wins!", newGame);
+            endGameDialog(window.bot.player, "You surrendered. The bot wins!", newGame);
         }
     } else {
-        newGame();
+        // gra z przyjacielem: przy nowej grze można zmienić tryb
+        chooseGameMode(true, newGame);
     }
 }
 
@@ -844,10 +896,15 @@ function moveBall(x, y) {
         return;
     }
 
-    // Bounce or change turn
+    // Bounce keeps the turn. Otherwise the move counts, and the turn passes
+    // once all moves of the turn are used (1 in normal mode, 2 in "2 moves in a row").
     if (!bounce) {
-        currentPlayer = currentPlayer === 1 ? 2 : 1;
-        updateBackground();
+        turnMoves++;
+        if (turnMoves >= movesPerTurn()) {
+            turnMoves = 0;
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            updateBackground();
+        }
     }
 
     if (getLegalMoves().length === 0) {
@@ -905,7 +962,9 @@ function updateScore() {
 
 function updateTurn() {
     const turnInfo = document.getElementById("turnInfo");
-    turnInfo.textContent = "Player " + currentPlayer + "'s turn";
+    let text = "Player " + currentPlayer + "'s turn";
+    if (movesPerTurn() > 1) text += " (move " + (turnMoves + 1) + "/" + movesPerTurn() + ")";
+    turnInfo.textContent = text;
     turnInfo.classList.remove("turn-change");
     void turnInfo.offsetWidth;
     turnInfo.classList.add("turn-change");

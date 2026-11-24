@@ -1,5 +1,7 @@
-// gameover.js - okienko "Game over": kto wygrał, wynik oraz przyciski Rematch i Back to menu.
-// Wczytywane przez endGameDialog() w script.js dopiero wtedy, gdy gra się kończy.
+// gameover.js - okienka gry:
+//  - "Game over": kto wygrał, wynik oraz przyciski Rematch i Back to menu (showGameOver),
+//  - wybór trybu gry z przyjacielem (showModeSelect).
+// Wczytywane przez script.js dopiero wtedy, gdy są potrzebne.
 
 (function () {
     const BLUE = "#2563eb";
@@ -65,6 +67,33 @@
 
         .gameOverCard .gameOverRematch {
             background: linear-gradient(135deg, #16a34a, #15803d);
+        }
+
+        .gameOverCard .gameModeOption {
+            width: 100%;
+            padding: 14px 16px;
+            text-align: left;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            background: rgba(148, 163, 184, 0.1);
+            box-shadow: none;
+        }
+
+        .gameOverCard .gameModeOption.selected {
+            border-color: #3b82f6;
+            background: rgba(37, 99, 235, 0.25);
+        }
+
+        .gameModeName {
+            display: block;
+            font-size: 17px;
+        }
+
+        .gameModeDesc {
+            display: block;
+            margin-top: 4px;
+            color: #a7b3c7;
+            font-size: 13px;
+            font-weight: 400;
         }
 
         .gameOverCard .gameOverBack {
@@ -149,5 +178,64 @@
         document.body.appendChild(overlay);
 
         rematch.focus();
+    };
+
+    // Tryby gry z przyjacielem (id są zapisywane w script.js jako gameMode)
+    const MODES = [
+        { id: "normal", name: "Normal", desc: "One move per turn." },
+        { id: "double", name: "2 moves in a row", desc: "Each turn has two moves. Bounces still give extra moves." }
+    ];
+
+    // current: aktualnie wybrany tryb, onChoose(id): po wyborze trybu,
+    // onCancel + cancelLabel: dolny przycisk (domyślnie "Back to menu")
+    window.showModeSelect = function ({ current, onChoose, onCancel, cancelLabel }) {
+        window.hideGameOver();
+
+        const title = document.createElement("p");
+        title.className = "gameOverTitle";
+        title.textContent = "GAME MODE";
+
+        const detail = document.createElement("p");
+        detail.className = "gameOverDetail";
+        detail.textContent = "Choose how you want to play";
+
+        const card = document.createElement("div");
+        card.className = "gameOverCard";
+        card.append(title, detail);
+
+        for (const mode of MODES) {
+            const button = document.createElement("button");
+            button.className = "gameModeOption" + (mode.id === current ? " selected" : "");
+
+            const name = document.createElement("span");
+            name.className = "gameModeName";
+            name.textContent = mode.name;
+
+            const desc = document.createElement("span");
+            desc.className = "gameModeDesc";
+            desc.textContent = mode.desc;
+
+            button.append(name, desc);
+            button.onclick = () => {
+                window.hideGameOver();
+                onChoose(mode.id);
+            };
+            card.appendChild(button);
+        }
+
+        const back = document.createElement("button");
+        back.className = "gameOverBack";
+        back.textContent = cancelLabel || "Back to menu";
+        back.onclick = () => {
+            window.hideGameOver();
+            if (onCancel) onCancel();
+            else backToMenu();
+        };
+        card.appendChild(back);
+
+        overlay = document.createElement("div");
+        overlay.className = "gameOverOverlay";
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
     };
 })();
