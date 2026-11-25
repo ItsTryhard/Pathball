@@ -17,11 +17,12 @@ const db = getDatabase(app);
 const STALE_MS = 15 * 60 * 1000;
 
 // ===== Kolejka (matchmaking) =====
-// W bazie jest jedno "miejsce w poczekalni": matchmaking/waiting = { id, ts }.
+// W bazie jest jedno "miejsce w poczekalni" na tryb: matchmaking/queues/<tryb> = { id, ts }.
 // Kto przyjdzie, gdy miejsce jest wolne, zajmuje je i czeka.
 // Kto przyjdzie, gdy ktoś już czeka, zwalnia miejsce, tworzy pokój
 // i wpisuje jego kod do matchmaking/matches/<id czekającego>. Obaj wchodzą do pokoju.
-const WAITING_PATH = "matchmaking/waiting";
+// Osobna poczekalnia dla każdego trybu gry ("normal", "double"), żeby gracze trafiali na kogoś z tym samym trybem.
+const queuePath = mode => `matchmaking/queues/${mode}`;
 const MATCHES_PATH = "matchmaking/matches";
 const HEARTBEAT_MS = 15 * 1000;          // co tyle czekający odświeża swój wpis
 const QUEUE_STALE_MS = 45 * 1000;        // wpis starszy niż to = gracz zniknął
@@ -36,7 +37,7 @@ let unsubPlayers = null;
 let pump = null;
 
 // Stan wyszukiwania przeciwnika
-const mm = { id: null, heartbeat: null, unsubMatch: null, retryTimer: null };
+const mm = { id: null, queue: null, heartbeat: null, unsubMatch: null, retryTimer: null };
 const myIds = new Set();   // wszystkie identyfikatory wyszukiwań z tej karty (żeby nie sparować się z samym sobą)
 
 // Czas serwera (różnica zegarów klientów nie psuje wykrywania starych wpisów)
@@ -125,7 +126,8 @@ function renderRoomCode(flash) {
     const { code, seat, opponentHere } = roomState;
     const color = seat === 1 ? "blue" : "red";
     const status = `You are Player ${seat} (${color}) · ` +
-        (opponentHere ? "opponent connected" : "waiting for opponent");
+        (opponentHere ? "opponent connected" : "waiting for opponent") +
+        (gameMode === "double" ? " · 2 moves in a row" : "");
 
     el.textContent = `Room code: ${code}\n` + (flash || status);
     el.classList.add("roomCode");
@@ -202,6 +204,29 @@ async function claimSeat(code) {
     return seat;
 }
 
+// Tryb pokoju prywatnego jest zapisany w bazie (rooms/<kod>/mode), żeby obaj gracze grali tak samo.
+// Pierwszy gracz w pokoju ustala tryb (jeśli ktoś już go ustalił, przejmuje go),
+// drugi czeka chwilę na zapis trybu i go przejmuje.
+const validMode = value => (value === "double" ? "double" : "normal");
+
+async function readRoomMode(code) {
+    for (let i = 0; i < 10; i++) {
+        const snap = await get(ref(db, `rooms/${code}/mode`));
+        if (snap.exists()) return validMode(snap.val());
+        await new Promise(resolve => setTimeout(resolve, 250));
+    }
+    return "normal";
+}
+
+async function syncRoomMode(code, seat) {
+    if (seat === 1) {
+        const res = await runTransaction(ref(db, `rooms/${code}/mode`), cur => cur || gameMode);
+        gameMode = validMode(res.snapshot.val());
+    } else {
+        gameMode = await readRoomMode(code);
+    }
+}
+
 const randomCode = () => Math.random().toString(36).slice(2, 6).toUpperCase();
 
 // Wejście do pokoju. matched = gra z kolejki (pilnujemy obecności przeciwnika).
@@ -209,13 +234,15 @@ async function joinRoom(code, matched) {
     const seat = await claimSeat(code);
     if (!seat) return 0;
 
+    onDisconnect(ref(db, `rooms/${code}/players/${seat}`)).remove();
+    if (!matched) await syncRoomMode(code, seat);   // w kolejce tryb wynika z wybranej poczekalni
+
     online.active = true;
     online.room = code;
     online.me = seat;
     online.matched = matched;
     queue = [];
 
-    onDisconnect(ref(db, `rooms/${code}/players/${seat}`)).remove();
     touch(code);
 
     hideLobby();
@@ -256,7 +283,8 @@ function watchPlayers(code, matched) {
             clearTimeout(timeout);
             if (matched) {
                 const color = online.me === 1 ? "blue" : "red";
-                setTimeout(() => alert(`Opponent found! You are Player ${online.me} (${color}).`), 0);
+                setTimeout(() => alert(`Opponent found! You are Player ${online.me} (${color}).` +
+                    (gameMode === "double" ? "\nMode: 2 moves in a row." : "")), 0);
             }
         } else if (!opponentHere && opponentSeen && matched) {
             opponentSeen = false;
@@ -274,11 +302,13 @@ async function findMatch(message = "Searching for an opponent…") {
     const myId = push(ref(db, MATCHES_PATH)).key;   // sam klucz, nic nie zapisuje
     myIds.add(myId);
     mm.id = myId;
+    const waitPath = queuePath(gameMode);   // poczekalnia dla wybranego trybu
+    mm.queue = waitPath;
     showLobby(message, true);
 
     let opponentId = null;
     try {
-        await runTransaction(ref(db, WAITING_PATH), cur => {
+        await runTransaction(ref(db, waitPath), cur => {
             opponentId = null;
             // wpis z wcześniejszego wyszukiwania z tej samej karty to nie przeciwnik
             if (cur && !myIds.has(cur.id) && serverNow() - cur.ts < QUEUE_STALE_MS) {
@@ -306,7 +336,7 @@ async function findMatch(message = "Searching for an opponent…") {
     }
 
     // Czekamy w poczekalni
-    onDisconnect(ref(db, WAITING_PATH)).remove();
+    onDisconnect(ref(db, waitPath)).remove();
     onDisconnect(ref(db, `${MATCHES_PATH}/${myId}`)).remove();
 
     mm.unsubMatch = onValue(ref(db, `${MATCHES_PATH}/${myId}`), async snap => {
@@ -317,14 +347,14 @@ async function findMatch(message = "Searching for an opponent…") {
         await joinRoom(code, true);
     });
 
-    mm.heartbeat = setInterval(() => heartbeat(myId), HEARTBEAT_MS);
+    mm.heartbeat = setInterval(() => heartbeat(myId, waitPath), HEARTBEAT_MS);
 }
 
 // Odświeża wpis w poczekalni. Jeśli ktoś go zabrał, a zaproszenie nie przyszło,
 // wracamy do kolejki od nowa.
-async function heartbeat(myId) {
+async function heartbeat(myId, waitPath) {
     let mine = false;
-    await runTransaction(ref(db, WAITING_PATH), cur => {
+    await runTransaction(ref(db, waitPath), cur => {
         mine = Boolean(cur && cur.id === myId);
         // Nie zwracamy undefined (to przerywa transakcję bez sprawdzenia serwera, gdy lokalna
         // pamięć jest pusta). Zwrócenie cur = "nic nie zmieniaj", a baza sprawdzi prawdziwą wartość.
@@ -346,6 +376,7 @@ async function heartbeat(myId) {
 // Zwraca obietnicę, żeby można było poczekać na usunięcie wpisu (np. przed wyjściem do menu).
 function stopSearch() {
     const myId = mm.id;
+    const waitPath = mm.queue;
     online.searching = false;
     mm.id = null;
     clearInterval(mm.heartbeat);
@@ -354,9 +385,9 @@ function stopSearch() {
     mm.unsubMatch = null;
     if (!myId) return Promise.resolve();
 
-    onDisconnect(ref(db, WAITING_PATH)).cancel();
+    onDisconnect(ref(db, waitPath)).cancel();
     onDisconnect(ref(db, `${MATCHES_PATH}/${myId}`)).cancel();
-    return runTransaction(ref(db, WAITING_PATH), cur => {
+    return runTransaction(ref(db, waitPath), cur => {
         // usuń tylko swój wpis; w innym wypadku zwróć cur (nie undefined, patrz heartbeat)
         return cur && cur.id === myId ? null : cur;
     }).catch(() => {});
@@ -381,11 +412,15 @@ window.playOnline = function () {
     showLobby();
 };
 
-document.getElementById("lobbyQuick").onclick = () => findMatch();
-document.getElementById("lobbyCreate").onclick = () => playPrivate("");
+// Quick match i tworzenie pokoju: najpierw wybór trybu (Cancel zostawia lobby bez zmian)
+document.getElementById("lobbyQuick").onclick = () => chooseGameMode(true, () => findMatch());
+document.getElementById("lobbyCreate").onclick = () => chooseGameMode(true, () => playPrivate(""));
 document.getElementById("lobbyJoin").onclick = () => {
     const code = (prompt("Room code:") || "").trim();
-    if (code) playPrivate(code);
+    if (code) {
+        gameMode = "normal";   // dołączając, tryb bierzemy z pokoju (tu: wartość domyślna dla pustego pokoju)
+        playPrivate(code);
+    }
 };
 lobbyCancel.onclick = cancelSearch;
 
