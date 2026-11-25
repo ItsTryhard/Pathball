@@ -127,7 +127,7 @@ function renderRoomCode(flash) {
     const color = seat === 1 ? "blue" : "red";
     const status = `You are Player ${seat} (${color}) · ` +
         (opponentHere ? "opponent connected" : "waiting for opponent") +
-        (gameMode === "double" ? " · 2 moves in a row" : "");
+        (gameMode !== "normal" ? " · " + MODE_LABELS[gameMode] : "");
 
     el.textContent = `Room code: ${code}\n` + (flash || status);
     el.classList.add("roomCode");
@@ -207,7 +207,7 @@ async function claimSeat(code) {
 // Tryb pokoju prywatnego jest zapisany w bazie (rooms/<kod>/mode), żeby obaj gracze grali tak samo.
 // Pierwszy gracz w pokoju ustala tryb (jeśli ktoś już go ustalił, przejmuje go),
 // drugi czeka chwilę na zapis trybu i go przejmuje.
-const validMode = value => (value === "double" ? "double" : "normal");
+const validMode = value => (value === "double" || value === "wide" ? value : "normal");
 
 async function readRoomMode(code) {
     for (let i = 0; i < 10; i++) {
@@ -221,9 +221,9 @@ async function readRoomMode(code) {
 async function syncRoomMode(code, seat) {
     if (seat === 1) {
         const res = await runTransaction(ref(db, `rooms/${code}/mode`), cur => cur || gameMode);
-        gameMode = validMode(res.snapshot.val());
+        setGameMode(validMode(res.snapshot.val()));
     } else {
-        gameMode = await readRoomMode(code);
+        setGameMode(await readRoomMode(code));
     }
 }
 
@@ -284,7 +284,7 @@ function watchPlayers(code, matched) {
             if (matched) {
                 const color = online.me === 1 ? "blue" : "red";
                 setTimeout(() => alert(`Opponent found! You are Player ${online.me} (${color}).` +
-                    (gameMode === "double" ? "\nMode: 2 moves in a row." : "")), 0);
+                    (gameMode !== "normal" ? "\nMode: " + MODE_LABELS[gameMode] + "." : "")), 0);
             }
         } else if (!opponentHere && opponentSeen && matched) {
             opponentSeen = false;
@@ -418,7 +418,7 @@ document.getElementById("lobbyCreate").onclick = () => chooseGameMode(true, () =
 document.getElementById("lobbyJoin").onclick = () => {
     const code = (prompt("Room code:") || "").trim();
     if (code) {
-        gameMode = "normal";   // dołączając, tryb bierzemy z pokoju (tu: wartość domyślna dla pustego pokoju)
+        setGameMode("normal");   // dołączając, tryb bierzemy z pokoju (tu: wartość domyślna dla pustego pokoju)
         playPrivate(code);
     }
 };

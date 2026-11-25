@@ -183,7 +183,8 @@
     // Tryby gry z przyjacielem (id są zapisywane w script.js jako gameMode)
     const MODES = [
         { id: "normal", name: "Normal", desc: "One move per turn." },
-        { id: "double", name: "2 moves in a row", desc: "Each turn has two moves. Bounces still give extra moves." }
+        { id: "double", name: "2 moves in a row", desc: "Each turn has two moves. Bounces still give extra moves." },
+        { id: "wide", name: "Wide goals", desc: "The goals are as wide as the whole pitch." }
     ];
 
     // current: aktualnie wybrany tryb, onChoose(id): po wyborze trybu,

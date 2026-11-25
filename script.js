@@ -11,8 +11,8 @@ const START_X = 30;
 const START_Y = 120;
 const BALL_MOVE_DURATION = 300;
 
-const GOAL_LEFT = 3;
-const GOAL_RIGHT = 5;
+let GOAL_LEFT = 3;    // zmieniane przez setGameMode() (tryb "wide": bramki na całą szerokość)
+let GOAL_RIGHT = 5;
 const GOAL_DEPTH = 1;
 const PORTRAIT_CANVAS_WIDTH = 780;
 const PORTRAIT_CANVAS_HEIGHT = 1140;
@@ -33,8 +33,19 @@ let gameOver = false;
 let ballAnimation = null;
 let pendingNextPlayer = null;
 let pointEndTimer = null;
-let gameMode = "normal";   // "normal" albo "double" (2 ruchy z rzędu, tylko gra z przyjacielem)
+let gameMode = "normal";   // "normal", "double" albo "wide" (patrz GAME_MODES), tylko gra z przyjacielem i online
 let turnMoves = 0;         // zwykłe (bez odbicia) ruchy wykonane w bieżącej turze
+
+// Tryby gry: "normal", "double" (2 ruchy z rzędu), "wide" (bramki szerokie na całe boisko)
+const GAME_MODES = ["normal", "double", "wide"];
+const MODE_LABELS = { normal: "Normal", double: "2 moves in a row", wide: "Wide goals" };
+
+// Ustawia tryb gry razem z szerokością bramek (słupki w rogach boiska w trybie "wide")
+function setGameMode(mode) {
+    gameMode = GAME_MODES.includes(mode) ? mode : "normal";
+    GOAL_LEFT = gameMode === "wide" ? 0 : 3;
+    GOAL_RIGHT = gameMode === "wide" ? COLS - 1 : 5;
+}
 
 const COLORS = {
     1: "#2563eb",
@@ -155,7 +166,7 @@ function isValidSavedGame(saved) {
             saved.pendingNextPlayer === 2
         ) &&
         (!saved.gameOver || saved.pendingNextPlayer !== null) &&
-        (saved.mode === undefined || saved.mode === "normal" || saved.mode === "double") &&
+        (saved.mode === undefined || GAME_MODES.includes(saved.mode)) &&
         (saved.turnMoves === undefined || (Number.isInteger(saved.turnMoves) && saved.turnMoves >= 0))
     );
 }
@@ -175,7 +186,12 @@ function loadGame() {
         return false;
     }
 
+    // Geometria bramek zależy od trybu, więc tryb ustawiamy przed sprawdzeniem zapisu
+    const previousMode = gameMode;
+    if (saved && GAME_MODES.includes(saved.mode)) setGameMode(saved.mode);
+
     if (!isValidSavedGame(saved)) {
+        setGameMode(previousMode);
         console.warn("Saved game has an invalid format.");
         return false;
     }
@@ -188,7 +204,7 @@ function loadGame() {
     visitedPoints = new Map(saved.visitedPoints);
     gameOver = saved.gameOver;
     pendingNextPlayer = saved.pendingNextPlayer;
-    gameMode = saved.mode === "double" ? "double" : "normal";
+    setGameMode(saved.mode);
     turnMoves = saved.turnMoves || 0;
     ballAnimation = null;
 
@@ -261,7 +277,7 @@ function chooseGameMode(canCancel, onChosen) {
             cancelLabel: canCancel ? "Cancel" : undefined,
             onCancel: canCancel ? () => {} : undefined,
             onChoose: id => {
-                gameMode = id;
+                setGameMode(id);
                 onChosen();
             }
         });
