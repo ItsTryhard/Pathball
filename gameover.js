@@ -23,6 +23,8 @@
 
         .gameOverCard {
             width: min(100%, 360px);
+            max-height: calc(100dvh - 40px);
+            overflow-y: auto;
             padding: 28px 22px 24px;
             text-align: center;
             color: #f8fafc;
@@ -210,7 +212,8 @@
         { id: "normal", name: "Normal", desc: "One move per turn." },
         { id: "double", name: "2 moves in a row", desc: "Each turn has two moves. Bounces still give extra moves." },
         { id: "wide", name: "Wide goals", desc: "The goals are as wide as the whole pitch." },
-        { id: "four", name: "4 players", desc: "Four players, four goals, square pitch." }
+        { id: "four", name: "4 players", desc: "Four players, four goals, square pitch." },
+        { id: "wrap", name: "Wrap-around", desc: "The side lines teleport the ball to the other side (no extra move)." }
     ];
 
     // current: aktualnie wybrany tryb, onChoose(id): po wyborze trybu,

@@ -215,7 +215,7 @@ async function claimSeat(code, maxSeats = 2) {
 // Tryb pokoju prywatnego jest zapisany w bazie (rooms/<kod>/mode), żeby obaj gracze grali tak samo.
 // Pierwszy gracz w pokoju ustala tryb (jeśli ktoś już go ustalił, przejmuje go),
 // drugi czeka chwilę na zapis trybu i go przejmuje.
-const validMode = value => (["double", "wide", "four"].includes(value) ? value : "normal");
+const validMode = value => (["double", "wide", "four", "wrap"].includes(value) ? value : "normal");
 
 async function readRoomMode(code) {
     for (let i = 0; i < 10; i++) {

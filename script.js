@@ -42,8 +42,8 @@ let gameMode = "normal";   // "normal", "double" albo "wide" (patrz GAME_MODES),
 let turnMoves = 0;         // zwykłe (bez odbicia) ruchy wykonane w bieżącej turze
 
 // Tryby gry: "normal", "double" (2 ruchy z rzędu), "wide" (bramki szerokie na całe boisko)
-const GAME_MODES = ["normal", "double", "wide", "four"];
-const MODE_LABELS = { normal: "Normal", double: "2 moves in a row", wide: "Wide goals", four: "4 players" };
+const GAME_MODES = ["normal", "double", "wide", "four", "wrap"];
+const MODE_LABELS = { normal: "Normal", double: "2 moves in a row", wide: "Wide goals", four: "4 players", wrap: "Wrap-around" };
 let playerCount = 2;       // 2 albo 4 (tryb "four")
 
 function seatsForMode(mode) {
@@ -77,8 +77,9 @@ function setGameMode(mode) {
     GOAL_BOTTOM = 5;
     LEFT_GOAL_X = -GOAL_DEPTH;
     RIGHT_GOAL_X = COLS - 1 + GOAL_DEPTH;
-    START_X = four ? 120 : 30;
-    PORTRAIT_CANVAS_WIDTH = four ? 960 : 780;
+    // tryb "wrap": szerszy margines po bokach, żeby piłka mogła wyjechać poza krawędź
+    START_X = four ? 120 : (gameMode === "wrap" ? 75 : 30);
+    PORTRAIT_CANVAS_WIDTH = four ? 960 : (gameMode === "wrap" ? 870 : 780);
     PORTRAIT_CANVAS_HEIGHT = four ? 960 : 1140;
 
     applyGameOrientation();
@@ -153,9 +154,12 @@ function applyGameOrientation() {
     // Boisko 4 graczy jest kwadratem, zwykłe boisko jest wysokim prostokątem (kształt z CSS)
     const container = canvas.parentElement;
     if (container && container.style) {
-        const four = playerCount === 4;
-        container.style.aspectRatio = four ? "1 / 1" : "";
-        container.style.width = four && isLandscape ? "min(100%, calc(100dvh - 24px))" : "";
+        // Zwykły kształt boiska pochodzi z CSS; tryby z innym rozmiarem płótna (4 graczy, wrap) ustawiają go tu
+        const custom = playerCount === 4 || gameMode === "wrap";
+        container.style.aspectRatio = custom ? canvas.width + " / " + canvas.height : "";
+        container.style.width = custom && isLandscape
+            ? "min(100%, calc((100dvh - 24px) * " + canvas.width + " / " + canvas.height + "))"
+            : "";
     }
 }
 
@@ -243,7 +247,8 @@ function isValidSavedGame(saved) {
             Number.isInteger(line.y2) &&
             isInsideFieldOrGoal(line.x1, line.y1) &&
             isInsideFieldOrGoal(line.x2, line.y2) &&
-            Math.abs(line.x1 - line.x2) <= 1 &&
+            (Math.abs(line.x1 - line.x2) <= 1 ||
+                (saved.mode === "wrap" && Math.abs(line.x1 - line.x2) === COLS - 1)) &&
             Math.abs(line.y1 - line.y2) <= 1 &&
             (line.x1 !== line.x2 || line.y1 !== line.y2) &&
             validPlayer(line.player)
@@ -679,34 +684,76 @@ function draw() {
     const sideGoalTop = getPosition(0, GOAL_TOP).y;
     const sideGoalBottom = getPosition(0, GOAL_BOTTOM).y;
 
+    const wrap = gameMode === "wrap";
+
     ctx.beginPath();
     ctx.moveTo(gl, tl.y);
     ctx.lineTo(tl.x, tl.y);
-    if (four) {
-        ctx.lineTo(tl.x, sideGoalTop);
-        ctx.moveTo(tl.x, sideGoalBottom);
+    if (wrap) {
+        ctx.moveTo(bl.x, bl.y);     // tryb wrap: bez bocznej ściany
+    } else {
+        if (four) {
+            ctx.lineTo(tl.x, sideGoalTop);
+            ctx.moveTo(tl.x, sideGoalBottom);
+        }
+        ctx.lineTo(bl.x, bl.y);
     }
-    ctx.lineTo(bl.x, bl.y);
     ctx.lineTo(gl, bl.y);
 
     ctx.moveTo(gr, tr.y);
     ctx.lineTo(tr.x, tr.y);
-    if (four) {
-        ctx.lineTo(tr.x, sideGoalTop);
-        ctx.moveTo(tr.x, sideGoalBottom);
+    if (wrap) {
+        ctx.moveTo(br.x, br.y);
+    } else {
+        if (four) {
+            ctx.lineTo(tr.x, sideGoalTop);
+            ctx.moveTo(tr.x, sideGoalBottom);
+        }
+        ctx.lineTo(br.x, br.y);
     }
-    ctx.lineTo(br.x, br.y);
     ctx.lineTo(gr, br.y);
     ctx.stroke();
+
+    // Tryb wrap: przerywane boczne linie pokazują, że prowadzą na drugą stronę boiska
+    if (wrap) {
+        ctx.strokeStyle = "#0ea5e9";
+        ctx.lineWidth = 5;
+        ctx.lineCap = "butt";
+        ctx.setLineDash([14, 12]);
+
+        ctx.beginPath();
+        ctx.moveTo(tl.x, tl.y);
+        ctx.lineTo(bl.x, bl.y);
+        ctx.moveTo(tr.x, tr.y);
+        ctx.lineTo(br.x, br.y);
+        ctx.stroke();
+
+        ctx.setLineDash([]);
+    }
 
     // Used paths
     lines.forEach(line => {
         const a = getPosition(line.x1, line.y1);
         const b = getPosition(line.x2, line.y2);
+        const wrapStep = Math.abs(line.x1 - line.x2) > 1
+            ? stepBetween(line.x1, line.y1, line.x2, line.y2)
+            : null;
 
         ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
+
+        if (wrapStep) {
+            // linia przez boczną krawędź: wyjście z jednej strony i wejście z drugiej
+            const exit = getPosition(line.x1 + wrapStep[0] * 0.5, line.y1 + wrapStep[1] * 0.5);
+            const enter = getPosition(line.x2 - wrapStep[0] * 0.5, line.y2 - wrapStep[1] * 0.5);
+
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(exit.x, exit.y);
+            ctx.moveTo(b.x, b.y);
+            ctx.lineTo(enter.x, enter.y);
+        } else {
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+        }
 
         ctx.strokeStyle = COLORS[line.player];
         ctx.lineWidth = 11;
@@ -742,6 +789,22 @@ function draw() {
         ctx.stroke();
     });
 
+    // Tryb wrap: znaczniki wyjścia przy krawędzi dla ruchów na drugą stronę
+    if (isHumanTurn() && gameMode === "wrap") getLegalMoves().forEach(({ x, y }) => {
+        const step = Math.abs(x - ball.x) > 1 ? stepBetween(ball.x, ball.y, x, y) : null;
+        if (!step) return;
+
+        const exit = getPosition(ball.x + step[0] * 0.5, ball.y + step[1] * 0.5);
+
+        ctx.beginPath();
+        ctx.arc(exit.x, exit.y, 11, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(34, 197, 94, 0.3)";
+        ctx.fill();
+        ctx.strokeStyle = "#15803d";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+    });
+
     // Ball
     let ballX = ball.x;
     let ballY = ball.y;
@@ -758,6 +821,21 @@ function draw() {
 
         ballY = ballAnimation.fromY +
             (ballAnimation.toY - ballAnimation.fromY) * easedProgress;
+
+        // przejście przez boczną krawędź: piłka wyjeżdża z jednej strony i wjeżdża z drugiej
+        if (ballAnimation.wrapDir) {
+            const [wdx, wdy] = ballAnimation.wrapDir;
+            const half = progress < 0.5 ? progress * 2 : (progress - 0.5) * 2;
+            const t = half * half * (3 - 2 * half);
+
+            if (progress < 0.5) {
+                ballX = ballAnimation.fromX + wdx * 0.5 * t;
+                ballY = ballAnimation.fromY + wdy * 0.5 * t;
+            } else {
+                ballX = ballAnimation.toX - wdx * 0.5 * (1 - t);
+                ballY = ballAnimation.toY - wdy * 0.5 * (1 - t);
+            }
+        }
 
         ballScale = 1 + 0.4 * lift;
         liftHeight = 22 * lift;
@@ -818,7 +896,8 @@ function hasUsedLineAt(x, y) {
 
 function isWallPosition(x, y) {
     // Left and right field walls (in the 4-player mode with an opening for the side goals)
-    if (x === 0 || x === COLS - 1) {
+    // (tryb "wrap": boczne linie nie są ścianami, tylko przejściami na drugą stronę)
+    if ((x === 0 || x === COLS - 1) && gameMode !== "wrap") {
         if (playerCount === 4 && y > GOAL_TOP && y < GOAL_BOTTOM) return false;
         return true;
     }
@@ -873,8 +952,10 @@ function isAlongSameWall(oldX, oldY, x, y) {
     const insideSideGoalMouth = four && inSideMouth(oldY) && inSideMouth(y);
 
     // Left and right field walls (moving along the open mouth of a side goal is allowed)
-    if (oldX === 0 && x === 0 && !insideSideGoalMouth) return true;
-    if (oldX === COLS - 1 && x === COLS - 1 && !insideSideGoalMouth) return true;
+    if (gameMode !== "wrap") {
+        if (oldX === 0 && x === 0 && !insideSideGoalMouth) return true;
+        if (oldX === COLS - 1 && x === COLS - 1 && !insideSideGoalMouth) return true;
+    }
 
     // Top field wall
     if (
@@ -948,17 +1029,23 @@ function isAlongSameWall(oldX, oldY, x, y) {
 
 // MOVE BALL
 
-function isLegalMove(x, y) {
-    const dx = x - ball.x;
-    const dy = y - ball.y;
+// Przesunięcie o jedno pole z (x1,y1) do (x2,y2) albo null, jeśli pola nie sąsiadują.
+// W trybie "wrap" lewa i prawa krawędź sąsiadują ze sobą (jak w Snake), więc dx = +/-(COLS-1) to ruch o jedno pole.
+function stepBetween(x1, y1, x2, y2) {
+    let dx = x2 - x1;
+    const dy = y2 - y1;
 
-    if (
-        Math.abs(dx) > 1 ||
-        Math.abs(dy) > 1 ||
-        (dx === 0 && dy === 0)
-    ) {
-        return false;
+    if (gameMode === "wrap") {
+        if (dx === COLS - 1) dx = -1;
+        else if (dx === -(COLS - 1)) dx = 1;
     }
+
+    if (Math.abs(dx) > 1 || Math.abs(dy) > 1 || (dx === 0 && dy === 0)) return null;
+    return [dx, dy];
+}
+
+function isLegalMove(x, y) {
+    if (!stepBetween(ball.x, ball.y, x, y)) return false;
 
     return (
         !gameOver &&
@@ -974,8 +1061,11 @@ function getLegalMoves() {
 
     for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
-            const x = ball.x + dx;
+            let x = ball.x + dx;
             const y = ball.y + dy;
+
+            // wrap: z lewej krawędzi na prawą i odwrotnie
+            if (gameMode === "wrap") x = (x + COLS) % COLS;
 
             if (isLegalMove(x, y)) {
                 moves.push({ x, y });
@@ -986,6 +1076,21 @@ function getLegalMoves() {
     return moves;
 }
 
+// Tryb "wrap": ruch przez boczną krawędź, którego znacznik wyjścia (pół pola za krawędzią) jest pod (rx, ry)
+// we współrzędnych siatki. Zwraca legalny ruch albo null.
+function wrapMoveAt(rx, ry) {
+    if (gameMode !== "wrap") return null;
+
+    for (const move of getLegalMoves()) {
+        if (Math.abs(move.x - ball.x) <= 1) continue;
+
+        const [dx, dy] = stepBetween(ball.x, ball.y, move.x, move.y);
+        if (Math.hypot(rx - (ball.x + dx * 0.5), ry - (ball.y + dy * 0.5)) < 0.4) return move;
+    }
+
+    return null;
+}
+
 function animateBall(fromX, fromY, toX, toY) {
     const animation = {
         fromX,
@@ -994,7 +1099,9 @@ function animateBall(fromX, fromY, toX, toY) {
         toY,
         player: currentPlayer,
         progress: 0,
-        startedAt: null
+        startedAt: null,
+        // ruch przez boczną krawędź: kierunek wyjścia (inaczej null)
+        wrapDir: Math.abs(toX - fromX) > 1 ? stepBetween(fromX, fromY, toX, toY) : null
     };
 
     ballAnimation = animation;
@@ -1148,8 +1255,15 @@ canvas.addEventListener("click", function(event) {
 
     const logicalX = isLandscape ? mouseY : mouseX;
     const logicalY = isLandscape ? canvas.width - mouseX : mouseY;
-    const x = Math.round((logicalX - START_X) / STEP);
-    const y = Math.round((logicalY - START_Y) / STEP);
+    let x = Math.round((logicalX - START_X) / STEP);
+    let y = Math.round((logicalY - START_Y) / STEP);
+
+    // Tryb wrap: dotknięcie znacznika wyjścia przy krawędzi też przenosi piłkę na drugą stronę
+    const portal = wrapMoveAt((logicalX - START_X) / STEP, (logicalY - START_Y) / STEP);
+    if (portal) {
+        x = portal.x;
+        y = portal.y;
+    }
 
     if (!isInsideFieldOrGoal(x, y)) return;
     if (!isHumanTurn()) return;
