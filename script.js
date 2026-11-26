@@ -4,28 +4,33 @@ const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 const COLS = 9;
-const ROWS = 11;
+let ROWS = 11;          // 11 w zwykłych trybach, 9 w trybie 4 graczy (kwadrat)
 
 const STEP = 90;
-const START_X = 30;
+let START_X = 30;       // w trybie 4 graczy większy margines na boczne bramki
 const START_Y = 120;
 const BALL_MOVE_DURATION = 300;
 
 let GOAL_LEFT = 3;    // zmieniane przez setGameMode() (tryb "wide": bramki na całą szerokość)
 let GOAL_RIGHT = 5;
 const GOAL_DEPTH = 1;
-const PORTRAIT_CANVAS_WIDTH = 780;
-const PORTRAIT_CANVAS_HEIGHT = 1140;
+let PORTRAIT_CANVAS_WIDTH = 780;
+let PORTRAIT_CANVAS_HEIGHT = 1140;
 
 const TOP_GOAL_Y = -GOAL_DEPTH;
-const BOTTOM_GOAL_Y = ROWS - 1 + GOAL_DEPTH;
+let BOTTOM_GOAL_Y = ROWS - 1 + GOAL_DEPTH;
+
+// Tryb 4 graczy: bramki boczne (słupki w wierszach GOAL_TOP i GOAL_BOTTOM, tylna ściana w kolumnie -1 i COLS)
+let GOAL_TOP = 3;
+let GOAL_BOTTOM = 5;
+let LEFT_GOAL_X = -GOAL_DEPTH;
+let RIGHT_GOAL_X = COLS - 1 + GOAL_DEPTH;
 
 let isLandscape = window.matchMedia("(orientation: landscape)").matches;
 let ball = { x: 4, y: 5 };
 let currentPlayer = 1;
 
-let score1 = 0;
-let score2 = 0;
+let scores = [0, 0];   // punkty graczy 1..4 (w trybach dwuosobowych tylko dwa)
 
 let lines = [];
 let visitedPoints = new Map();
@@ -37,20 +42,98 @@ let gameMode = "normal";   // "normal", "double" albo "wide" (patrz GAME_MODES),
 let turnMoves = 0;         // zwykłe (bez odbicia) ruchy wykonane w bieżącej turze
 
 // Tryby gry: "normal", "double" (2 ruchy z rzędu), "wide" (bramki szerokie na całe boisko)
-const GAME_MODES = ["normal", "double", "wide"];
-const MODE_LABELS = { normal: "Normal", double: "2 moves in a row", wide: "Wide goals" };
+const GAME_MODES = ["normal", "double", "wide", "four"];
+const MODE_LABELS = { normal: "Normal", double: "2 moves in a row", wide: "Wide goals", four: "4 players" };
+let playerCount = 2;       // 2 albo 4 (tryb "four")
+
+function seatsForMode(mode) {
+    return mode === "four" ? 4 : 2;
+}
+
+// Następny gracz w kolejności tur (1 -> 2 -> ... -> ostatni -> 1)
+function nextPlayerAfter(player) {
+    return player % playerCount + 1;
+}
+
+// Punkt startowy piłki: środek boiska
+function startPoint() {
+    return { x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) };
+}
 
 // Ustawia tryb gry razem z szerokością bramek (słupki w rogach boiska w trybie "wide")
 function setGameMode(mode) {
     gameMode = GAME_MODES.includes(mode) ? mode : "normal";
+    playerCount = seatsForMode(gameMode);
+    const four = playerCount === 4;
+
+    // Bramki u góry i na dole: szerokie na całe boisko ("wide") albo zwykłe
     GOAL_LEFT = gameMode === "wide" ? 0 : 3;
     GOAL_RIGHT = gameMode === "wide" ? COLS - 1 : 5;
+
+    // Tryb 4 graczy: kwadrat 9x9 z czterema bramkami
+    ROWS = four ? 9 : 11;
+    BOTTOM_GOAL_Y = ROWS - 1 + GOAL_DEPTH;
+    GOAL_TOP = 3;
+    GOAL_BOTTOM = 5;
+    LEFT_GOAL_X = -GOAL_DEPTH;
+    RIGHT_GOAL_X = COLS - 1 + GOAL_DEPTH;
+    START_X = four ? 120 : 30;
+    PORTRAIT_CANVAS_WIDTH = four ? 960 : 780;
+    PORTRAIT_CANVAS_HEIGHT = four ? 960 : 1140;
+
+    applyGameOrientation();
+    updateScoreboard();
 }
 
+// Karty wyników: w trybie 4 graczy doklejamy karty gracza 3 (zielony) i 4 (żółty), w pozostałych je chowamy
+function updateScoreboard() {
+    const container = document.querySelector(".score");
+    if (!container) return;
+
+    if (!document.getElementById("fourPlayerStyle")) {
+        const style = document.createElement("style");
+        style.id = "fourPlayerStyle";
+        style.textContent = `
+            .score.four { flex-wrap: wrap; gap: 8px; }
+            .score.four .player { padding: 6px 10px; font-size: 13px; }
+            .score.four .player strong { font-size: 18px; margin-left: 2px; }
+        `;
+        document.head.appendChild(style);
+    }
+
+    const four = playerCount === 4;
+    container.classList.toggle("four", four);
+
+    for (let n = 3; n <= 4; n++) {
+        let card = document.getElementById("playerCard" + n);
+
+        if (!card && four) {
+            card = document.createElement("div");
+            card.className = "player";
+            card.id = "playerCard" + n;
+            card.style.setProperty("--player-color", COLORS[n]);
+
+            const dot = document.createElement("span");
+            dot.style.cssText = "width:13px;height:13px;border-radius:50%;background:" + COLORS[n];
+
+            const value = document.createElement("strong");
+            value.id = "score" + n;
+            value.textContent = "0";
+
+            card.append(dot, "Player " + n, value);
+            container.appendChild(card);
+        }
+
+        if (card) card.style.display = four ? "" : "none";
+    }
+}
 const COLORS = {
-    1: "#2563eb",
-    2: "#ef4444"
+    1: "#2563eb",   // niebieski
+    2: "#ef4444",   // czerwony
+    3: "#16a34a",   // zielony (tryb 4 graczy)
+    4: "#eab308"    // żółty (tryb 4 graczy)
 };
+const COLOR_NAMES = ["blue", "red", "green", "yellow"];
 
 function applyGameOrientation() {
     gameScreen.classList.toggle("landscape", isLandscape);
@@ -66,6 +149,14 @@ function applyGameOrientation() {
     orientationButton.title = isLandscape
         ? "Switch to portrait layout"
         : "Switch to landscape layout";
+
+    // Boisko 4 graczy jest kwadratem, zwykłe boisko jest wysokim prostokątem (kształt z CSS)
+    const container = canvas.parentElement;
+    if (container && container.style) {
+        const four = playerCount === 4;
+        container.style.aspectRatio = four ? "1 / 1" : "";
+        container.style.width = four && isLandscape ? "min(100%, calc(100dvh - 24px))" : "";
+    }
 }
 
 function toggleOrientation() {
@@ -114,8 +205,9 @@ function saveGame() {
         version: 1,
         ball,
         currentPlayer,
-        score1,
-        score2,
+        score1: scores[0],
+        score2: scores[1],
+        scores,
         lines,
         visitedPoints: Array.from(visitedPoints.entries()),
         gameOver,
@@ -126,6 +218,10 @@ function saveGame() {
 }
 
 function isValidSavedGame(saved) {
+    const players = saved && saved.mode === "four" ? 4 : 2;
+    const scoreList = saved && (Array.isArray(saved.scores) ? saved.scores : [saved.score1, saved.score2]);
+    const validPlayer = value => Number.isInteger(value) && value >= 1 && value <= players;
+
     return Boolean(
         saved &&
         saved.version === 1 &&
@@ -133,11 +229,11 @@ function isValidSavedGame(saved) {
         Number.isInteger(saved.ball.x) &&
         Number.isInteger(saved.ball.y) &&
         isInsideFieldOrGoal(saved.ball.x, saved.ball.y) &&
-        (saved.currentPlayer === 1 || saved.currentPlayer === 2) &&
-        Number.isInteger(saved.score1) &&
-        saved.score1 >= 0 &&
-        Number.isInteger(saved.score2) &&
-        saved.score2 >= 0 &&
+        validPlayer(saved.currentPlayer) &&
+        Array.isArray(scoreList) &&
+        scoreList.length === players &&
+        scoreList.every(Number.isInteger) &&
+        (players === 4 || scoreList.every(value => value >= 0)) &&
         Array.isArray(saved.lines) &&
         saved.lines.every(line =>
             line &&
@@ -150,21 +246,17 @@ function isValidSavedGame(saved) {
             Math.abs(line.x1 - line.x2) <= 1 &&
             Math.abs(line.y1 - line.y2) <= 1 &&
             (line.x1 !== line.x2 || line.y1 !== line.y2) &&
-            (line.player === 1 || line.player === 2)
+            validPlayer(line.player)
         ) &&
         Array.isArray(saved.visitedPoints) &&
         saved.visitedPoints.every(entry =>
             Array.isArray(entry) &&
             entry.length === 2 &&
             typeof entry[0] === "string" &&
-            (entry[1] === 1 || entry[1] === 2)
+            validPlayer(entry[1])
         ) &&
         typeof saved.gameOver === "boolean" &&
-        (
-            saved.pendingNextPlayer === null ||
-            saved.pendingNextPlayer === 1 ||
-            saved.pendingNextPlayer === 2
-        ) &&
+        (saved.pendingNextPlayer === null || validPlayer(saved.pendingNextPlayer)) &&
         (!saved.gameOver || saved.pendingNextPlayer !== null) &&
         (saved.mode === undefined || GAME_MODES.includes(saved.mode)) &&
         (saved.turnMoves === undefined || (Number.isInteger(saved.turnMoves) && saved.turnMoves >= 0))
@@ -198,8 +290,7 @@ function loadGame() {
 
     ball = saved.ball;
     currentPlayer = saved.currentPlayer;
-    score1 = saved.score1;
-    score2 = saved.score2;
+    scores = Array.isArray(saved.scores) ? saved.scores.slice() : [saved.score1, saved.score2];
     lines = saved.lines;
     visitedPoints = new Map(saved.visitedPoints);
     gameOver = saved.gameOver;
@@ -251,11 +342,11 @@ function loadGameOverUI() {
 }
 
 // Koniec gry: okienko Game over (gameover.js). Gdyby się nie wczytało, zwykły alert.
-function endGameDialog(winner, message, onRematch) {
+function endGameDialog(winner, message, onRematch, loser) {
     gameOver = true;    // plansza zamrożona do czasu wyboru Rematch / Back to menu
     loadGameOverUI().then(ok => {
         if (ok) {
-            showGameOver({ winner, message, score1, score2, onRematch });
+            showGameOver({ winner, loser, message, scores: scores.slice(), onRematch });
         } else {
             alert(message);
             onRematch();
@@ -292,11 +383,10 @@ function newGame() {
     pendingNextPlayer = null;
     turnMoves = 0;
     ballAnimation = null;
-    ball = { x: 4, y: 5 };
+    ball = startPoint();
     currentPlayer = 1;
 
-    score1 = 0;
-    score2 = 0;
+    scores = new Array(playerCount).fill(0);
 
     lines = [];
     visitedPoints = new Map([[`${ball.x},${ball.y}`, currentPlayer]]);
@@ -311,7 +401,7 @@ function newGame() {
 }
 
 function completePoint(nextPlayer) {
-    ball = { x: 4, y: 5 };
+    ball = startPoint();
     lines = [];
     ballAnimation = null;
     currentPlayer = nextPlayer;
@@ -346,7 +436,7 @@ function updateActionButton() {
 
 function restartClick() {
     if (window.online && window.online.active) {
-        if (confirm("Surrender? Your opponent will win.")) {
+        if (confirm(playerCount === 4 ? "Surrender? You will lose a point." : "Surrender? Your opponent will win.")) {
             window.online.surrender();
         }
     } else if (window.bot && window.bot.active) {
@@ -368,44 +458,63 @@ function getPosition(x, y) {
     };
 }
 
+// Do którego gracza należy bramka: w grze dwuosobowej górna do gracza 2, dolna do gracza 1;
+// w grze czteroosobowej (zgodnie z ruchem wskazówek zegara): dół 1, lewa 2, góra 3, prawa 4
+function sideOwner(side) {
+    if (side === "bottom") return 1;
+    if (side === "left") return 2;
+    if (side === "top") return playerCount === 4 ? 3 : 2;
+    return 4;
+}
+
+// Właściciel bramki, w której leży punkt (0 = to nie jest pole bramkowe)
+function goalOwnerAt(x, y) {
+    if (x > GOAL_LEFT && x < GOAL_RIGHT) {
+        if (y === TOP_GOAL_Y) return sideOwner("top");
+        if (y === BOTTOM_GOAL_Y) return sideOwner("bottom");
+    }
+
+    if (playerCount === 4 && y > GOAL_TOP && y < GOAL_BOTTOM) {
+        if (x === LEFT_GOAL_X) return sideOwner("left");
+        if (x === RIGHT_GOAL_X) return sideOwner("right");
+    }
+
+    return 0;
+}
+
 function isGoalPosition(x, y) {
-    return (
-        x > GOAL_LEFT &&
-        x < GOAL_RIGHT &&
-        (y === TOP_GOAL_Y || y === BOTTOM_GOAL_Y)
-    );
+    return goalOwnerAt(x, y) !== 0;
 }
 
 function isGoalBackCorner(x, y) {
-    return (
+    if (
         (y === TOP_GOAL_Y || y === BOTTOM_GOAL_Y) &&
         (x === GOAL_LEFT || x === GOAL_RIGHT)
-    );
-}
-
-function isInsideFieldOrGoal(x, y) {
-    if (x < 0 || x >= COLS) return false;
-
-    if (y >= 0 && y < ROWS) return true;
-
-    // Top goal
-    if (
-        y >= TOP_GOAL_Y &&
-        y < 0 &&
-        x >= GOAL_LEFT &&
-        x <= GOAL_RIGHT
     ) {
         return true;
     }
 
-    // Bottom goal
-    if (
-        y > ROWS - 1 &&
-        y <= BOTTOM_GOAL_Y &&
-        x >= GOAL_LEFT &&
-        x <= GOAL_RIGHT
-    ) {
-        return true;
+    return (
+        playerCount === 4 &&
+        (x === LEFT_GOAL_X || x === RIGHT_GOAL_X) &&
+        (y === GOAL_TOP || y === GOAL_BOTTOM)
+    );
+}
+
+function isInsideFieldOrGoal(x, y) {
+    // The field itself
+    if (x >= 0 && x < COLS && y >= 0 && y < ROWS) return true;
+
+    // Top goal and bottom goal
+    if (x >= GOAL_LEFT && x <= GOAL_RIGHT) {
+        if (y >= TOP_GOAL_Y && y < 0) return true;
+        if (y > ROWS - 1 && y <= BOTTOM_GOAL_Y) return true;
+    }
+
+    // Left goal and right goal (4 players)
+    if (playerCount === 4 && y >= GOAL_TOP && y <= GOAL_BOTTOM) {
+        if (x >= LEFT_GOAL_X && x < 0) return true;
+        if (x > COLS - 1 && x <= RIGHT_GOAL_X) return true;
     }
 
     return false;
@@ -419,6 +528,51 @@ function isHumanTurn() {
 
 // DRAWING
 
+// Prostokąt tła i ściany bramki w współrzędnych siatki (side: "top" | "bottom" | "left" | "right")
+function goalGeometry(side) {
+    if (side === "top") {
+        return {
+            rect: [GOAL_LEFT, TOP_GOAL_Y, GOAL_RIGHT, 0],
+            walls: [
+                [GOAL_LEFT, 0, GOAL_LEFT, TOP_GOAL_Y],
+                [GOAL_RIGHT, 0, GOAL_RIGHT, TOP_GOAL_Y],
+                [GOAL_LEFT, TOP_GOAL_Y, GOAL_RIGHT, TOP_GOAL_Y]
+            ]
+        };
+    }
+
+    if (side === "bottom") {
+        return {
+            rect: [GOAL_LEFT, ROWS - 1, GOAL_RIGHT, BOTTOM_GOAL_Y],
+            walls: [
+                [GOAL_LEFT, ROWS - 1, GOAL_LEFT, BOTTOM_GOAL_Y],
+                [GOAL_RIGHT, ROWS - 1, GOAL_RIGHT, BOTTOM_GOAL_Y],
+                [GOAL_LEFT, BOTTOM_GOAL_Y, GOAL_RIGHT, BOTTOM_GOAL_Y]
+            ]
+        };
+    }
+
+    if (side === "left") {
+        return {
+            rect: [LEFT_GOAL_X, GOAL_TOP, 0, GOAL_BOTTOM],
+            walls: [
+                [0, GOAL_TOP, LEFT_GOAL_X, GOAL_TOP],
+                [0, GOAL_BOTTOM, LEFT_GOAL_X, GOAL_BOTTOM],
+                [LEFT_GOAL_X, GOAL_TOP, LEFT_GOAL_X, GOAL_BOTTOM]
+            ]
+        };
+    }
+
+    return {
+        rect: [COLS - 1, GOAL_TOP, RIGHT_GOAL_X, GOAL_BOTTOM],
+        walls: [
+            [COLS - 1, GOAL_TOP, RIGHT_GOAL_X, GOAL_TOP],
+            [COLS - 1, GOAL_BOTTOM, RIGHT_GOAL_X, GOAL_BOTTOM],
+            [RIGHT_GOAL_X, GOAL_TOP, RIGHT_GOAL_X, GOAL_BOTTOM]
+        ]
+    };
+}
+
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -430,6 +584,8 @@ function draw() {
         ctx.translate(canvas.width, 0);
         ctx.rotate(Math.PI / 2);
     }
+
+    const four = playerCount === 4;
 
     // Horizontal field lines
     ctx.strokeStyle = "#78916f";
@@ -455,84 +611,59 @@ function draw() {
         ctx.stroke();
     }
 
-    // Vertical field lines
+    // Vertical field lines (in the 4-player mode the side edges have openings for the goals)
     for (let x = 0; x < COLS; x++) {
         const top = getPosition(x, 0);
         const bottom = getPosition(x, ROWS - 1);
 
         ctx.beginPath();
-        ctx.moveTo(top.x, top.y);
-        ctx.lineTo(bottom.x, bottom.y);
+
+        if (four && (x === 0 || x === COLS - 1)) {
+            ctx.moveTo(top.x, top.y);
+            ctx.lineTo(top.x, getPosition(x, GOAL_TOP).y);
+
+            ctx.moveTo(bottom.x, getPosition(x, GOAL_BOTTOM).y);
+            ctx.lineTo(bottom.x, bottom.y);
+        } else {
+            ctx.moveTo(top.x, top.y);
+            ctx.lineTo(bottom.x, bottom.y);
+        }
+
         ctx.stroke();
     }
 
-    // Goal backgrounds show the opposing player's color.
+    // Goals: background in the owner's color, then the posts and the back wall
+    const sides = four ? ["bottom", "left", "top", "right"] : ["top", "bottom"];
+
     ctx.globalAlpha = 0.3;
-    ctx.fillStyle = COLORS[2];
 
-    ctx.fillRect(
-        START_X + GOAL_LEFT * STEP,
-        START_Y - STEP,
-        (GOAL_RIGHT - GOAL_LEFT) * STEP,
-        STEP
-    );
+    for (const side of sides) {
+        const goal = goalGeometry(side);
+        const a = getPosition(goal.rect[0], goal.rect[1]);
+        const b = getPosition(goal.rect[2], goal.rect[3]);
 
-    ctx.fillStyle = COLORS[1];
-
-    ctx.fillRect(
-        START_X + GOAL_LEFT * STEP,
-        START_Y + (ROWS - 1) * STEP,
-        (GOAL_RIGHT - GOAL_LEFT) * STEP,
-        STEP
-    );
+        ctx.fillStyle = COLORS[sideOwner(side)];
+        ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+    }
 
     ctx.globalAlpha = 1;
 
-    // Goal walls
     ctx.strokeStyle = "#527b4a";
     ctx.lineWidth = 7;
 
-    // Top goal
-    ctx.beginPath();
-    ctx.moveTo(START_X + GOAL_LEFT * STEP, START_Y);
-    ctx.lineTo(START_X + GOAL_LEFT * STEP, START_Y - STEP);
+    for (const side of sides) {
+        ctx.beginPath();
 
-    ctx.moveTo(START_X + GOAL_RIGHT * STEP, START_Y);
-    ctx.lineTo(START_X + GOAL_RIGHT * STEP, START_Y - STEP);
+        for (const [x1, y1, x2, y2] of goalGeometry(side).walls) {
+            const a = getPosition(x1, y1);
+            const b = getPosition(x2, y2);
 
-    ctx.moveTo(START_X + GOAL_LEFT * STEP, START_Y - STEP);
-    ctx.lineTo(START_X + GOAL_RIGHT * STEP, START_Y - STEP);
-    ctx.stroke();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+        }
 
-    // Bottom goal
-    ctx.beginPath();
-    ctx.moveTo(
-        START_X + GOAL_LEFT * STEP,
-        START_Y + (ROWS - 1) * STEP
-    );
-    ctx.lineTo(
-        START_X + GOAL_LEFT * STEP,
-        START_Y + ROWS * STEP
-    );
-
-    ctx.moveTo(
-        START_X + GOAL_RIGHT * STEP,
-        START_Y + (ROWS - 1) * STEP
-    );
-    ctx.lineTo(
-        START_X + GOAL_RIGHT * STEP,
-        START_Y + ROWS * STEP
-    );
-
-    ctx.moveTo(
-        START_X + GOAL_LEFT * STEP,
-        START_Y + ROWS * STEP
-    );
-    ctx.lineTo(
-        START_X + GOAL_RIGHT * STEP,
-        START_Y + ROWS * STEP
-    );
-    ctx.stroke();
+        ctx.stroke();
+    }
 
     // Field border (same style as the goal walls)
     ctx.strokeStyle = "#527b4a";
@@ -545,15 +676,25 @@ function draw() {
     const br = getPosition(COLS - 1, ROWS - 1);
     const gl = getPosition(GOAL_LEFT, 0).x;
     const gr = getPosition(GOAL_RIGHT, 0).x;
+    const sideGoalTop = getPosition(0, GOAL_TOP).y;
+    const sideGoalBottom = getPosition(0, GOAL_BOTTOM).y;
 
     ctx.beginPath();
     ctx.moveTo(gl, tl.y);
     ctx.lineTo(tl.x, tl.y);
+    if (four) {
+        ctx.lineTo(tl.x, sideGoalTop);
+        ctx.moveTo(tl.x, sideGoalBottom);
+    }
     ctx.lineTo(bl.x, bl.y);
     ctx.lineTo(gl, bl.y);
 
     ctx.moveTo(gr, tr.y);
     ctx.lineTo(tr.x, tr.y);
+    if (four) {
+        ctx.lineTo(tr.x, sideGoalTop);
+        ctx.moveTo(tr.x, sideGoalBottom);
+    }
     ctx.lineTo(br.x, br.y);
     ctx.lineTo(gr, br.y);
     ctx.stroke();
@@ -575,7 +716,7 @@ function draw() {
 
     // Grid points
     for (let y = TOP_GOAL_Y; y <= BOTTOM_GOAL_Y; y++) {
-        for (let x = 0; x < COLS; x++) {
+        for (let x = LEFT_GOAL_X; x <= RIGHT_GOAL_X; x++) {
             if (!isInsideFieldOrGoal(x, y)) continue;
 
             const p = getPosition(x, y);
@@ -676,8 +817,11 @@ function hasUsedLineAt(x, y) {
 // WALLS
 
 function isWallPosition(x, y) {
-    // Left and right field walls
-    if (x === 0 || x === COLS - 1) return true;
+    // Left and right field walls (in the 4-player mode with an opening for the side goals)
+    if (x === 0 || x === COLS - 1) {
+        if (playerCount === 4 && y > GOAL_TOP && y < GOAL_BOTTOM) return false;
+        return true;
+    }
 
     // Goal corners where the posts meet the field boundary
     if (
@@ -715,13 +859,22 @@ function isWallPosition(x, y) {
         return true;
     }
 
+    // Back walls of the side goals (4 players)
+    if (playerCount === 4 && (x === LEFT_GOAL_X || x === RIGHT_GOAL_X)) {
+        return true;
+    }
+
     return false;
 }
 
 function isAlongSameWall(oldX, oldY, x, y) {
-    // Left and right field walls
-    if (oldX === 0 && x === 0) return true;
-    if (oldX === COLS - 1 && x === COLS - 1) return true;
+    const four = playerCount === 4;
+    const inSideMouth = value => value >= GOAL_TOP && value <= GOAL_BOTTOM;
+    const insideSideGoalMouth = four && inSideMouth(oldY) && inSideMouth(y);
+
+    // Left and right field walls (moving along the open mouth of a side goal is allowed)
+    if (oldX === 0 && x === 0 && !insideSideGoalMouth) return true;
+    if (oldX === COLS - 1 && x === COLS - 1 && !insideSideGoalMouth) return true;
 
     // Top field wall
     if (
@@ -773,6 +926,21 @@ function isAlongSameWall(oldX, oldY, x, y) {
         (oldY === BOTTOM_GOAL_Y && y === BOTTOM_GOAL_Y)
     ) {
         return true;
+    }
+
+    // Side goals (4 players): posts and back walls
+    if (four) {
+        for (const post of [GOAL_TOP, GOAL_BOTTOM]) {
+            if (oldY === post && y === post && oldX <= 0 && x <= 0 && (oldX < 0 || x < 0)) return true;
+            if (oldY === post && y === post && oldX >= COLS - 1 && x >= COLS - 1 && (oldX > COLS - 1 || x > COLS - 1)) return true;
+        }
+
+        if (
+            (oldX === LEFT_GOAL_X && x === LEFT_GOAL_X) ||
+            (oldX === RIGHT_GOAL_X && x === RIGHT_GOAL_X)
+        ) {
+            return true;
+        }
     }
 
     return false;
@@ -856,22 +1024,20 @@ function animateBall(fromX, fromY, toX, toY) {
     requestAnimationFrame(renderFrame);
 }
 
-function finishPoint(winner, message) {
-    if (winner === 1) {
-        score1++;
-    } else {
-        score2++;
-    }
+// winner: gracz, który zdobywa punkt (0 = nikt), loser: gracz, który traci punkt (tylko tryb 4 graczy)
+function finishPoint(winner, message, loser) {
+    if (winner) scores[winner - 1]++;
+    if (loser) scores[loser - 1]--;
 
     updateScore();
     gameOver = true;
     document.getElementById("turnInfo").textContent = message;
     draw();
-    pendingNextPlayer = currentPlayer === 1 ? 2 : 1;
+    pendingNextPlayer = nextPlayerAfter(currentPlayer);
     saveGame();
 
     pointEndTimer = setTimeout(() => {
-        endGameDialog(winner, message, () => completePoint(pendingNextPlayer));
+        endGameDialog(winner, message, () => completePoint(pendingNextPlayer), loser);
     }, BALL_MOVE_DURATION + 180);
 }
 
@@ -907,8 +1073,23 @@ function moveBall(x, y) {
 
     // GOAL
     if (isGoalPosition(x, y)) {
-        const winner = y === TOP_GOAL_Y ? 1 : 2;
-        finishPoint(winner, "GOAL! Player " + winner + " wins the point!");
+        if (playerCount === 2) {
+            const winner = y === TOP_GOAL_Y ? 1 : 2;
+            finishPoint(winner, "GOAL! Player " + winner + " wins the point!");
+        } else {
+            // 4 graczy: kto wprowadzi piłkę do cudzej bramki, zdobywa punkt; do własnej traci punkt
+            const owner = goalOwnerAt(x, y);
+
+            if (owner === currentPlayer) {
+                finishPoint(0, "Own goal! Player " + currentPlayer + " loses a point.", currentPlayer);
+            } else {
+                finishPoint(
+                    currentPlayer,
+                    "GOAL! Player " + currentPlayer + " scores in Player " + owner + "'s goal!"
+                );
+            }
+        }
+
         return;
     }
 
@@ -918,9 +1099,20 @@ function moveBall(x, y) {
         turnMoves++;
         if (turnMoves >= movesPerTurn()) {
             turnMoves = 0;
-            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            currentPlayer = nextPlayerAfter(currentPlayer);
             updateBackground();
         }
+    }
+
+    if (getLegalMoves().length === 0 && playerCount === 4) {
+        // 4 graczy: kto nie ma ruchu, traci punkt
+        finishPoint(
+            0,
+            "Player " + currentPlayer + " has no legal moves and loses a point.",
+            currentPlayer
+        );
+
+        return;
     }
 
     if (getLegalMoves().length === 0) {
@@ -972,8 +1164,10 @@ canvas.addEventListener("click", function(event) {
 // UPDATE UI
 
 function updateScore() {
-    document.getElementById("score1").textContent = score1;
-    document.getElementById("score2").textContent = score2;
+    for (let player = 1; player <= playerCount; player++) {
+        const element = document.getElementById("score" + player);
+        if (element) element.textContent = scores[player - 1];
+    }
 }
 
 function updateTurn() {

@@ -4,8 +4,7 @@
 // Wczytywane przez script.js dopiero wtedy, gdy są potrzebne.
 
 (function () {
-    const BLUE = "#2563eb";
-    const RED = "#ef4444";
+    const PLAYER_COLORS = ["#2563eb", "#ef4444", "#16a34a", "#eab308"];   // niebieski, czerwony, zielony, żółty
 
     const style = document.createElement("style");
     style.textContent = `
@@ -130,10 +129,33 @@
         }
     };
 
-    // winner: 1 lub 2, message: krótki opis (np. "GOAL! Player 1 wins the point!"),
-    // onRematch: co zrobić po kliknięciu Rematch
-    window.showGameOver = function ({ winner, message, score1, score2, onRematch }) {
+    // Napis o wyniku punktu. Tryby dwuosobowe: "You win!" / "Bot wins!" / "Player 1 wins!".
+    // Tryb 4 graczy: ktoś zdobywa punkt albo traci punkt (gol samobójczy, brak ruchu, poddanie się).
+    function headlineFor(winner, loser, multi) {
+        if (!multi) return { text: winnerText(winner), color: PLAYER_COLORS[winner - 1] };
+
+        const me = window.online && window.online.active ? window.online.me : 0;
+
+        if (winner) {
+            return {
+                text: winner === me ? "You score!" : "Player " + winner + " scores!",
+                color: PLAYER_COLORS[winner - 1]
+            };
+        }
+
+        return {
+            text: loser === me ? "You lose a point" : "Player " + loser + " loses a point",
+            color: PLAYER_COLORS[(loser || 1) - 1]
+        };
+    }
+
+    // winner: gracz zdobywający punkt (0 = nikt), loser: gracz tracący punkt (tryb 4 graczy),
+    // message: krótki opis, scores: punkty wszystkich graczy, onRematch: co zrobić po kliknięciu Rematch
+    window.showGameOver = function ({ winner, loser, message, scores, score1, score2, onRematch }) {
         window.hideGameOver();
+
+        const list = scores || [score1, score2];
+        const headline = headlineFor(winner, loser, list.length > 2);
 
         const title = document.createElement("p");
         title.className = "gameOverTitle";
@@ -141,8 +163,8 @@
 
         const winnerEl = document.createElement("div");
         winnerEl.className = "gameOverWinner";
-        winnerEl.textContent = winnerText(winner);
-        winnerEl.style.color = winner === 1 ? BLUE : RED;
+        winnerEl.textContent = headline.text;
+        winnerEl.style.color = headline.color;
 
         const detail = document.createElement("p");
         detail.className = "gameOverDetail";
@@ -150,7 +172,10 @@
 
         const score = document.createElement("div");
         score.className = "gameOverScore";
-        score.append(colored(String(score1), BLUE), " : ", colored(String(score2), RED));
+        list.forEach((value, index) => {
+            if (index > 0) score.append(" : ");
+            score.append(colored(String(value), PLAYER_COLORS[index]));
+        });
 
         const rematch = document.createElement("button");
         rematch.className = "gameOverRematch";
@@ -184,7 +209,8 @@
     const MODES = [
         { id: "normal", name: "Normal", desc: "One move per turn." },
         { id: "double", name: "2 moves in a row", desc: "Each turn has two moves. Bounces still give extra moves." },
-        { id: "wide", name: "Wide goals", desc: "The goals are as wide as the whole pitch." }
+        { id: "wide", name: "Wide goals", desc: "The goals are as wide as the whole pitch." },
+        { id: "four", name: "4 players", desc: "Four players, four goals, square pitch." }
     ];
 
     // current: aktualnie wybrany tryb, onChoose(id): po wyborze trybu,

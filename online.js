@@ -28,7 +28,7 @@ const HEARTBEAT_MS = 15 * 1000;          // co tyle czekający odświeża swój 
 const QUEUE_STALE_MS = 45 * 1000;        // wpis starszy niż to = gracz zniknął
 const OPPONENT_TIMEOUT_MS = 15 * 1000;   // tyle czekamy, aż przeciwnik wejdzie do pokoju
 
-const online = { active: false, room: null, me: 0, searching: false, matched: false };
+const online = { active: false, room: null, me: 0, searching: false, matched: false, maxPlayers: 2, allHere: true };
 window.online = online;
 
 let queue = [];       // ruchy czekające na wykonanie
@@ -37,7 +37,8 @@ let unsubPlayers = null;
 let pump = null;
 
 // Stan wyszukiwania przeciwnika
-const mm = { id: null, queue: null, heartbeat: null, unsubMatch: null, retryTimer: null };
+const GROUP_SIZE = 4;   // tryb 4 graczy: tylu graczy potrzeba do rozpoczęcia gry z kolejki
+const mm = { id: null, queue: null, multi: false, queueData: null, heartbeat: null, unsubMatch: null, unsubCount: null, countTimer: null, retryTimer: null };
 const myIds = new Set();   // wszystkie identyfikatory wyszukiwań z tej karty (żeby nie sparować się z samym sobą)
 
 // Czas serwera (różnica zegarów klientów nie psuje wykrywania starych wpisów)
@@ -102,7 +103,7 @@ roomStyle.textContent = `
 `;
 document.head.appendChild(roomStyle);
 
-let roomState = null;   // { code, seat, opponentHere } albo null, gdy nie jesteśmy w pokoju prywatnym
+let roomState = null;   // { code, seat, present, max } albo null, gdy nie jesteśmy w pokoju prywatnym
 
 function renderRoomCode(flash) {
     let el = document.querySelector(".instructions");
@@ -123,11 +124,13 @@ function renderRoomCode(flash) {
     }
     if (el.dataset.original === undefined) el.dataset.original = el.textContent;
 
-    const { code, seat, opponentHere } = roomState;
-    const color = seat === 1 ? "blue" : "red";
-    const status = `You are Player ${seat} (${color}) · ` +
-        (opponentHere ? "opponent connected" : "waiting for opponent") +
-        (gameMode !== "normal" ? " · " + MODE_LABELS[gameMode] : "");
+    const { code, seat, present, max } = roomState;
+    const color = COLOR_NAMES[seat - 1];
+    const people = max > 2
+        ? `${present}/${max} players`
+        : (present >= max ? "opponent connected" : "waiting for opponent");
+    const status = `You are Player ${seat} (${color}) · ${people}` +
+        (gameMode !== "normal" && gameMode !== "four" ? " · " + MODE_LABELS[gameMode] : "");
 
     el.textContent = `Room code: ${code}\n` + (flash || status);
     el.classList.add("roomCode");
@@ -141,8 +144,8 @@ function renderRoomCode(flash) {
     };
 }
 
-function showRoomCode(code, seat, opponentHere) {
-    roomState = { code, seat, opponentHere };
+function showRoomCode(code, seat, present, max) {
+    roomState = { code, seat, present, max };
     renderRoomCode();
 }
 
@@ -183,8 +186,12 @@ function startPump() {
         if (m.t === "reset") {
             newGame();
         } else if (m.t === "surrender") {
-            const winner = m.p === 1 ? 2 : 1;
-            endGameDialog(winner, "Player " + m.p + " surrendered.", newGame);
+            if (playerCount === 4) {
+                finishPoint(0, "Player " + m.p + " surrendered and loses a point.", m.p);
+            } else {
+                const winner = m.p === 1 ? 2 : 1;
+                endGameDialog(winner, "Player " + m.p + " surrendered.", newGame);
+            }
         } else {
             moveBall(m.x, m.y);
         }
@@ -192,12 +199,13 @@ function startPump() {
 }
 
 // Zajmuje wolne miejsce (1 = niebieski, 2 = czerwony); 0 = pokój pełny
-async function claimSeat(code) {
+async function claimSeat(code, maxSeats = 2) {
     let seat = 0;
     await runTransaction(ref(db, `rooms/${code}/players`), cur => {
         cur = cur || {};
-        if (!cur[1]) { seat = 1; cur[1] = true; return cur; }
-        if (!cur[2]) { seat = 2; cur[2] = true; return cur; }
+        for (let s = 1; s <= maxSeats; s++) {
+            if (!cur[s]) { seat = s; cur[s] = true; return cur; }
+        }
         seat = 0;
         return; // przerwij – pokój pełny
     });
@@ -207,7 +215,7 @@ async function claimSeat(code) {
 // Tryb pokoju prywatnego jest zapisany w bazie (rooms/<kod>/mode), żeby obaj gracze grali tak samo.
 // Pierwszy gracz w pokoju ustala tryb (jeśli ktoś już go ustalił, przejmuje go),
 // drugi czeka chwilę na zapis trybu i go przejmuje.
-const validMode = value => (value === "double" || value === "wide" ? value : "normal");
+const validMode = value => (["double", "wide", "four"].includes(value) ? value : "normal");
 
 async function readRoomMode(code) {
     for (let i = 0; i < 10; i++) {
@@ -231,16 +239,35 @@ const randomCode = () => Math.random().toString(36).slice(2, 6).toUpperCase();
 
 // Wejście do pokoju. matched = gra z kolejki (pilnujemy obecności przeciwnika).
 async function joinRoom(code, matched) {
-    const seat = await claimSeat(code);
+    // Ile miejsc ma pokój: w pokoju prywatnym wynika z jego trybu (jeśli pokój już istnieje)
+    let maxSeats = seatsForMode(gameMode);
+    if (!matched) {
+        const existing = await get(ref(db, `rooms/${code}/mode`));
+        if (existing.exists()) maxSeats = seatsForMode(validMode(existing.val()));
+    }
+
+    const seat = await claimSeat(code, maxSeats);
     if (!seat) return 0;
 
     onDisconnect(ref(db, `rooms/${code}/players/${seat}`)).remove();
-    if (!matched) await syncRoomMode(code, seat);   // w kolejce tryb wynika z wybranej poczekalni
+
+    if (!matched) {
+        await syncRoomMode(code, seat);   // w kolejce tryb wynika z wybranej poczekalni
+
+        if (seat > seatsForMode(gameMode)) {
+            // pokój ma mniej miejsc, niż zajęliśmy (wyścig przy zakładaniu pokoju): zwalniamy miejsce
+            onDisconnect(ref(db, `rooms/${code}/players/${seat}`)).cancel();
+            await set(ref(db, `rooms/${code}/players/${seat}`), null);
+            return 0;
+        }
+    }
 
     online.active = true;
     online.room = code;
     online.me = seat;
     online.matched = matched;
+    online.maxPlayers = seatsForMode(gameMode);
+    online.allHere = online.maxPlayers === 2;   // w grze 4-osobowej ruchy ruszają, gdy są wszyscy
     queue = [];
 
     touch(code);
@@ -248,7 +275,7 @@ async function joinRoom(code, matched) {
     hideLobby();
     newGame();
     updateActionButton();
-    if (matched) hideRoomCode(); else showRoomCode(code, seat, false);
+    if (matched) hideRoomCode(); else showRoomCode(code, seat, 1, online.maxPlayers);
 
     unsubMoves = onChildAdded(ref(db, `rooms/${code}/moves`), snap => {
         queue.push(snap.val());
@@ -258,44 +285,58 @@ async function joinRoom(code, matched) {
     return seat;
 }
 
-// Pilnuje, kto jest w pokoju: czeka na przeciwnika i wykrywa jego wyjście
+// Pilnuje, kto jest w pokoju: czeka na wszystkich graczy i wykrywa wyjście któregoś z nich
 function watchPlayers(code, matched) {
-    let opponentSeen = false;
+    let everyoneSeen = false;
     let timeout = null;
+    const max = online.maxPlayers;
 
     if (matched) {
         timeout = setTimeout(async () => {
-            if (opponentSeen || online.room !== code) return;
-            // przeciwnik nie dotarł – wracamy do kolejki
+            if (everyoneSeen || online.room !== code) return;
+            // nie wszyscy dotarli – wracamy do kolejki
             await leaveRoom();
-            findMatch("Opponent didn't connect. Searching again…");
+            findMatch(max > 2
+                ? "Players didn't connect. Searching again…"
+                : "Opponent didn't connect. Searching again…");
         }, OPPONENT_TIMEOUT_MS);
     }
 
     unsubPlayers = onValue(ref(db, `rooms/${code}/players`), snap => {
         if (online.room !== code) return;
         const players = snap.val() || {};
-        const opponentHere = Boolean(players[3 - online.me]);
-        if (!matched) showRoomCode(code, online.me, opponentHere);
 
-        if (opponentHere && !opponentSeen) {
-            opponentSeen = true;
+        let present = 0;
+        for (let seat = 1; seat <= max; seat++) {
+            if (players[seat]) present++;
+        }
+
+        const allHere = present === max;
+        online.allHere = allHere;
+        if (!matched) showRoomCode(code, online.me, present, max);
+
+        if (allHere && !everyoneSeen) {
+            everyoneSeen = true;
             clearTimeout(timeout);
             if (matched) {
-                const color = online.me === 1 ? "blue" : "red";
-                setTimeout(() => alert(`Opponent found! You are Player ${online.me} (${color}).` +
-                    (gameMode !== "normal" ? "\nMode: " + MODE_LABELS[gameMode] + "." : "")), 0);
+                const color = COLOR_NAMES[online.me - 1];
+                setTimeout(() => alert(
+                    `${max > 2 ? "Players found" : "Opponent found"}! You are Player ${online.me} (${color}).` +
+                    (gameMode !== "normal" && gameMode !== "four" ? "\nMode: " + MODE_LABELS[gameMode] + "." : "")
+                ), 0);
             }
-        } else if (!opponentHere && opponentSeen && matched) {
-            opponentSeen = false;
-            leaveRoom().then(() => showLobby("Your opponent left the game."));
+        } else if (!allHere && everyoneSeen && matched) {
+            everyoneSeen = false;
+            leaveRoom().then(() => showLobby(max > 2 ? "A player left the game." : "Your opponent left the game."));
         }
     });
 }
 
 // ===== Kolejka =====
-async function findMatch(message = "Searching for an opponent…") {
+async function findMatch(message) {
     if (online.searching || online.active) return;
+    if (seatsForMode(gameMode) > 2) return findMatchGroup(message);
+    if (!message) message = "Searching for an opponent…";
     cleanupStaleRooms();
 
     online.searching = true;
@@ -350,6 +391,130 @@ async function findMatch(message = "Searching for an opponent…") {
     mm.heartbeat = setInterval(() => heartbeat(myId, waitPath), HEARTBEAT_MS);
 }
 
+// ===== Kolejka grupowa (tryb 4 graczy) =====
+// Poczekalnia to lista: matchmaking/queues/<tryb>/<id> = { ts }. Kto przyjdzie jako ostatni potrzebny
+// (czwarty), zabiera trzech czekających, tworzy pokój i wpisuje jego kod do matchmaking/matches/<id>.
+
+async function findMatchGroup(message) {
+    cleanupStaleRooms();
+
+    online.searching = true;
+    const myId = push(ref(db, MATCHES_PATH)).key;   // sam klucz, nic nie zapisuje
+    myIds.add(myId);
+    mm.id = myId;
+    mm.multi = true;
+    const waitPath = queuePath(gameMode);
+    mm.queue = waitPath;
+    showLobby(message || "Searching for players…", true);
+
+    let invited = null;
+    try {
+        await runTransaction(ref(db, waitPath), cur => {
+            invited = null;
+            const now = serverNow();
+            const fresh = {};
+
+            // zostają tylko świeże wpisy; wpisy z tej karty (wcześniejsze wyszukiwania) są wyrzucane
+            for (const id of Object.keys(cur || {})) {
+                const entry = cur[id];
+                if (entry && typeof entry.ts === "number" && now - entry.ts < QUEUE_STALE_MS && !myIds.has(id)) {
+                    fresh[id] = entry;
+                }
+            }
+
+            const waiting = Object.keys(fresh);
+            if (waiting.length + 1 >= GROUP_SIZE) {
+                // grupa jest pełna: zabieramy najdłużej czekających
+                waiting.sort((a, b) => fresh[a].ts - fresh[b].ts);
+                invited = waiting.slice(0, GROUP_SIZE - 1);
+                for (const id of invited) delete fresh[id];
+            } else {
+                fresh[myId] = { ts: now };   // czekamy my
+            }
+
+            return Object.keys(fresh).length ? fresh : null;
+        });
+    } catch (e) {
+        console.warn("Queue failed:", e);
+        stopSearch();
+        showLobby("Couldn't join the queue. Try again.");
+        return;
+    }
+
+    if (!online.searching || mm.id !== myId) return;   // anulowano w międzyczasie
+
+    if (invited) {
+        // Tworzymy pokój i zapraszamy pozostałych
+        const code = randomCode();
+        stopSearch();
+        await Promise.all(invited.map(id => set(ref(db, `${MATCHES_PATH}/${id}`), code)));
+        await joinRoom(code, true);
+        return;
+    }
+
+    // Czekamy w poczekalni
+    onDisconnect(ref(db, `${waitPath}/${myId}`)).remove();
+    onDisconnect(ref(db, `${MATCHES_PATH}/${myId}`)).remove();
+
+    mm.unsubMatch = onValue(ref(db, `${MATCHES_PATH}/${myId}`), async snap => {
+        const code = snap.val();
+        if (!code || mm.id !== myId) return;
+        stopSearch();
+        remove(ref(db, `${MATCHES_PATH}/${myId}`));
+        await joinRoom(code, true);
+    });
+
+    showQueueCount(1);
+    watchQueueCount(waitPath);
+    mm.heartbeat = setInterval(() => heartbeatGroup(myId, waitPath), HEARTBEAT_MS);
+}
+
+// Napis "x/4 players": ile osób jest w kolejce (razem z nami)
+function showQueueCount(count) {
+    lobbyStatus.textContent = `Searching for players… ${count}/${GROUP_SIZE} players`;
+}
+
+function watchQueueCount(waitPath) {
+    const render = data => {
+        const now = serverNow();
+        let count = 0;
+
+        for (const id of Object.keys(data || {})) {
+            const entry = data[id];
+            if (entry && typeof entry.ts === "number" && now - entry.ts < QUEUE_STALE_MS) count++;
+        }
+
+        if (online.searching && mm.multi) showQueueCount(Math.min(count, GROUP_SIZE));
+    };
+
+    mm.unsubCount = onValue(ref(db, waitPath), snap => {
+        mm.queueData = snap.val();
+        render(mm.queueData);
+    });
+    mm.countTimer = setInterval(() => render(mm.queueData), 5000);   // wpisy "starzeją się" także bez zmian w bazie
+}
+
+// Odświeża swój wpis w poczekalni grupowej. Jeśli wpis zniknął, a zaproszenie nie przyszło,
+// wracamy do kolejki od nowa.
+async function heartbeatGroup(myId, waitPath) {
+    let mine = false;
+    await runTransaction(ref(db, waitPath), cur => {
+        mine = Boolean(cur && cur[myId]);
+        if (!mine) return cur;                  // nie zwracamy undefined (patrz heartbeat)
+        cur[myId] = { ts: serverNow() };
+        return cur;
+    }).catch(() => {});
+
+    if (mine || mm.id !== myId) return;
+
+    clearTimeout(mm.retryTimer);
+    mm.retryTimer = setTimeout(() => {
+        if (mm.id !== myId || !online.searching) return;   // zaproszenie przyszło
+        stopSearch();
+        findMatch();
+    }, 3000);
+}
+
 // Odświeża wpis w poczekalni. Jeśli ktoś go zabrał, a zaproszenie nie przyszło,
 // wracamy do kolejki od nowa.
 async function heartbeat(myId, waitPath) {
@@ -377,13 +542,28 @@ async function heartbeat(myId, waitPath) {
 function stopSearch() {
     const myId = mm.id;
     const waitPath = mm.queue;
+    const multi = mm.multi;
     online.searching = false;
     mm.id = null;
+    mm.multi = false;
     clearInterval(mm.heartbeat);
+    clearInterval(mm.countTimer);
     clearTimeout(mm.retryTimer);
     if (mm.unsubMatch) mm.unsubMatch();
+    if (mm.unsubCount) mm.unsubCount();
     mm.unsubMatch = null;
+    mm.unsubCount = null;
     if (!myId) return Promise.resolve();
+
+    if (multi) {
+        onDisconnect(ref(db, `${waitPath}/${myId}`)).cancel();
+        onDisconnect(ref(db, `${MATCHES_PATH}/${myId}`)).cancel();
+        return runTransaction(ref(db, waitPath), cur => {
+            if (!cur || !cur[myId]) return cur;     // nie nasz wpis albo pusto: nic nie zmieniaj
+            delete cur[myId];
+            return Object.keys(cur).length ? cur : null;
+        }).catch(() => {});
+    }
 
     onDisconnect(ref(db, waitPath)).cancel();
     onDisconnect(ref(db, `${MATCHES_PATH}/${myId}`)).cancel();
@@ -426,6 +606,7 @@ lobbyCancel.onclick = cancelSearch;
 
 online.click = (x, y) => {
     if (currentPlayer !== online.me) return;            // nie twoja tura
+    if (!online.allHere) return;                        // w grze 4-osobowej czekamy na wszystkich graczy
     if (ballAnimation || gameOver || queue.length) return;
     if (!isLegalMove(x, y)) return;
     push(ref(db, `rooms/${online.room}/moves`), { t: "move", x, y });
