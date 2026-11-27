@@ -55,6 +55,11 @@ function nextPlayerAfter(player) {
     return player % playerCount + 1;
 }
 
+// Gracz po przeciwnej stronie boiska (tryb 4 graczy): 1 <-> 3 (dół i góra), 2 <-> 4 (lewa i prawa)
+function oppositePlayer(player) {
+    return (player + 1) % 4 + 1;
+}
+
 // Punkt startowy piłki: środek boiska
 function startPoint() {
     return { x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) };
@@ -1184,17 +1189,16 @@ function moveBall(x, y) {
             const winner = y === TOP_GOAL_Y ? 1 : 2;
             finishPoint(winner, "GOAL! Player " + winner + " wins the point!");
         } else {
-            // 4 graczy: kto wprowadzi piłkę do cudzej bramki, zdobywa punkt; do własnej traci punkt
+            // 4 graczy: gol do bramki daje punkt graczowi po przeciwnej stronie boiska (niezależnie od tego,
+            // kto wprowadził piłkę, także przy golu do własnej bramki)
             const owner = goalOwnerAt(x, y);
+            const scorer = oppositePlayer(owner);
 
-            if (owner === currentPlayer) {
-                finishPoint(0, "Own goal! Player " + currentPlayer + " loses a point.", currentPlayer);
-            } else {
-                finishPoint(
-                    currentPlayer,
-                    "GOAL! Player " + currentPlayer + " scores in Player " + owner + "'s goal!"
-                );
-            }
+            finishPoint(
+                scorer,
+                (owner === currentPlayer ? "Own goal! " : "GOAL in Player " + owner + "'s goal! ") +
+                    "Player " + scorer + " (opposite) scores."
+            );
         }
 
         return;

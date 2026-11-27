@@ -212,7 +212,7 @@
         { id: "normal", name: "Normal", desc: "One move per turn." },
         { id: "double", name: "2 moves in a row", desc: "Each turn has two moves. Bounces still give extra moves." },
         { id: "wide", name: "Wide goals", desc: "The goals are as wide as the whole pitch." },
-        { id: "four", name: "4 players", desc: "Four players, four goals, square pitch." },
+        { id: "four", name: "4 players", desc: "Four players, four goals, square pitch. A goal gives the point to the player on the opposite side." },
         { id: "wrap", name: "Wrap-around", desc: "The side lines teleport the ball to the other side (no extra move)." }
     ];
 
